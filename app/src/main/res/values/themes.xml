@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.Suvrnika" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#FF17302A</item>
+        <item name="android:windowBackground">#FFFAF7F2</item>
+    </style>
+</resources>
