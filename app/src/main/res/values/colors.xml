@@ -1,3 +1,5 @@
 <resources>
     <color name="ic_launcher_background">#17302A</color>
+    <color name="icon_gold">#C9A45C</color>
+    <color name="icon_gold_light">#E9D7AE</color>
 </resources>

@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -47,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -66,6 +69,7 @@ import com.suvrnika.app.data.Repository
 import com.suvrnika.app.payment.PaymentCoordinator
 import com.suvrnika.app.ui.theme.Brand
 import com.suvrnika.app.util.inr
+import com.suvrnika.app.util.metalLabel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -77,6 +81,9 @@ val LocalToast = staticCompositionLocalOf<(String) -> Unit> { {} }
 val LocalConfig = compositionLocalOf<AppConfig?> { null }
 /** Ask the app shell to refresh the bag badge after bag/wishlist changes. */
 val LocalBagChanged = staticCompositionLocalOf<() -> Unit> { {} }
+
+/** Widest a column of text/cards grows on tablets before it is centred. */
+val MAX_CONTENT_WIDTH = 760.dp
 
 // ---------------------------------------------------------------- loading server data
 /**
@@ -134,8 +141,12 @@ fun <T> LoadList(state: Load<T>, modifier: Modifier = Modifier, content: LazyLis
         data == null && err == null -> Box(modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = Brand.Gold) }
         data == null && err != null -> ErrorState(err, onRetry = state::refresh)
         data != null -> PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = state::refresh, modifier = modifier.fillMaxSize()) {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                content(data)
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                // Phones use the full width; on tablets the column stays at a comfortable reading width.
+                val side = maxOf(16.dp, (maxWidth - MAX_CONTENT_WIDTH) / 2)
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = side, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    content(data)
+                }
             }
         }
     }
@@ -279,16 +290,27 @@ fun ItemImage(imageUrl: String?, metal: String, modifier: Modifier = Modifier) {
 
 @Composable
 fun ProductCard(item: Item, onOpen: () -> Unit, onWish: (() -> Unit)?, modifier: Modifier = Modifier) {
-    Column(modifier.clickable(onClick = onOpen), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(
+        modifier.clip(RoundedCornerShape(14.dp)).background(Color.White).border(1.dp, Brand.Line, RoundedCornerShape(14.dp)).clickable(onClick = onOpen),
+    ) {
         Box {
-            ItemImage(item.imageUrl, item.metal, Modifier.fillMaxWidth().aspectRatio(0.82f))
+            ItemImage(item.imageUrl, item.metal, Modifier.fillMaxWidth().aspectRatio(0.9f))
+            Text(
+                metalLabel(item.metal).uppercase(), Modifier.align(Alignment.TopStart).padding(8.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.85f)).padding(horizontal = 8.dp, vertical = 3.dp),
+                style = MaterialTheme.typography.labelSmall, color = Brand.GoldDark,
+            )
             if (onWish != null) IconButton(onClick = onWish, modifier = Modifier.align(Alignment.TopEnd)) {
-                Icon(if (item.wished) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = "Wishlist", tint = Brand.Gold)
+                Box(Modifier.size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.9f)), Alignment.Center) {
+                    Icon(if (item.wished) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = "Wishlist", tint = Brand.Gold, modifier = Modifier.size(18.dp))
+                }
             }
             if (item.stock <= 0) Text("SOLD OUT", Modifier.align(Alignment.BottomStart).background(Brand.Ink).padding(6.dp, 3.dp), color = Color.White, style = MaterialTheme.typography.labelSmall)
+            else if (item.stock <= 2) Text("ONLY ${item.stock} LEFT", Modifier.align(Alignment.BottomStart).background(Brand.Gold).padding(6.dp, 3.dp), color = Color.White, style = MaterialTheme.typography.labelSmall)
         }
-        Text("${item.purityLabel} · ${"%.1f".format(item.netMg / 1000.0)} g".uppercase(), style = MaterialTheme.typography.labelSmall, color = Brand.Muted)
-        Text(item.name, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(inr(item.price.basePaise), fontWeight = FontWeight.SemiBold)
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text("${item.purityLabel} · ${"%.1f".format(item.netMg / 1000.0)} g".uppercase(), style = MaterialTheme.typography.labelSmall, color = Brand.Muted, maxLines = 1)
+            Text(item.name, style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp, lineHeight = 22.sp), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.height(44.dp))
+            Text(inr(item.price.basePaise), fontWeight = FontWeight.Bold, color = Brand.Ink)
+        }
     }
 }

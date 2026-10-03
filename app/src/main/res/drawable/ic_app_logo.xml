@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- In-app logo: the launcher mark on its emerald tile, framed to the visible part of the adaptive icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="40dp" android:height="40dp"
+    android:viewportWidth="72" android:viewportHeight="72">
+    <group android:translateX="-18" android:translateY="-20">
+        <path android:pathData="M0,0h108v108h-108z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="radial" android:centerX="30" android:centerY="22" android:gradientRadius="110"
+                    android:startColor="#FF2C5A4D" android:endColor="#FF0F241F" />
+            </aapt:attr>
+        </path>
+        <path android:strokeColor="#FFC9A45C" android:strokeWidth="2.2" android:fillColor="#00000000"
+            android:pathData="M54,58 m-24,0 a24,24 0,1 0,48 0 a24,24 0,1 0,-48 0" />
+        <path android:fillColor="#FFE9D7AE" android:pathData="M54,23 L60.5,29.5 L54,38 L47.5,29.5 Z" />
+        <path android:fillColor="#FFC9A45C" android:pathData="M47.5,29.5 L60.5,29.5 L54,38 Z" />
+        <path android:strokeColor="#FFE9D7AE" android:strokeWidth="4.2" android:strokeLineCap="round" android:fillColor="#00000000"
+            android:pathData="M63,48.5 C60,44.5 47.5,43.5 46,50.5 C44.5,57 62,57 62,65 C62,72.5 48.5,74 44.5,69.5" />
+    </group>
+</vector>

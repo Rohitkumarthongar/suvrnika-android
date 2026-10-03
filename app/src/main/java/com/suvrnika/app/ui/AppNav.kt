@@ -4,6 +4,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material.icons.outlined.LocalOffer
+import androidx.compose.material.icons.outlined.Search
+import com.suvrnika.app.ui.components.OfferPopupHost
+import com.suvrnika.app.ui.theme.Display
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -164,11 +169,18 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Image(
                                 painter = painterResource(R.drawable.ic_app_logo),
-                                contentDescription = "Suvrnika Logo",
-                                modifier = Modifier.size(34.dp).clip(RoundedCornerShape(6.dp))
+                                contentDescription = null,
+                                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)),
                             )
-                            Text(config?.company?.name ?: "SUVRNIKA", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                            Column {
+                                Text(config?.company?.name ?: "SUVRNIKA", fontFamily = Display, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, letterSpacing = 3.sp)
+                                Text((config?.company?.tag?.ifBlank { null } ?: "Fine jewellery").uppercase(), fontSize = 9.sp, letterSpacing = 2.sp, color = Brand.Gold, fontWeight = FontWeight.Bold)
+                            }
                         }
+                    },
+                    actions = {
+                        if (route != "shop") IconButton(onClick = { nav.navigate("shop") { launchSingleTop = true } }) { Icon(Icons.Outlined.Search, "Search") }
+                        IconButton(onClick = { nav.navigate("offers") }) { Icon(Icons.Outlined.LocalOffer, "Offers") }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Brand.Ivory),
                 ) else TopAppBar(
@@ -231,5 +243,6 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
                 composable("help") { HelpScreen() }
             }
         }
+        OfferPopupHost(currentRoute = route, blocked = mock != null)
     }
 }

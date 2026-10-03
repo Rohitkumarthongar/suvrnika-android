@@ -2,16 +2,20 @@ package com.suvrnika.app.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
@@ -27,7 +31,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -36,15 +44,26 @@ import com.suvrnika.app.data.Branch
 import com.suvrnika.app.ui.components.Chip
 import com.suvrnika.app.ui.components.Divider
 import com.suvrnika.app.ui.components.Eyebrow
+import com.suvrnika.app.ui.components.GhostButton
 import com.suvrnika.app.ui.components.Heading
+import com.suvrnika.app.ui.components.JournalCard
+import com.suvrnika.app.ui.components.JournalCover
 import com.suvrnika.app.ui.components.KeyValue
+import com.suvrnika.app.ui.components.LoadGrid
 import com.suvrnika.app.ui.components.LoadList
 import com.suvrnika.app.ui.components.LocalConfig
 import com.suvrnika.app.ui.components.LocalNav
 import com.suvrnika.app.ui.components.LocalRepo
 import com.suvrnika.app.ui.components.Muted
+import com.suvrnika.app.ui.components.OfferCard
 import com.suvrnika.app.ui.components.Panel
+import com.suvrnika.app.ui.components.PrimaryButton
+import com.suvrnika.app.ui.components.SectionHeader
 import com.suvrnika.app.ui.components.Tone
+import com.suvrnika.app.ui.components.endsIn
+import com.suvrnika.app.ui.components.full
+import com.suvrnika.app.ui.components.openStoreLink
+import com.suvrnika.app.ui.components.readMinutes
 import com.suvrnika.app.ui.components.rememberLoad
 import com.suvrnika.app.ui.components.rememberRunner
 import com.suvrnika.app.ui.theme.Brand
@@ -54,6 +73,8 @@ import java.util.Locale
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.roundToLong
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 private fun openUri(context: android.content.Context, uri: String) {
     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
@@ -166,31 +187,69 @@ fun CalculatorScreen() {
 private fun s2d(s: String) = s.toDoubleOrNull() ?: 1.0
 
 // ---------------------------------------------------------------- offers & journal
+private val AUDIENCE = mapOf("ALL" to "Everyone", "NEW_CUSTOMERS" to "New customers", "EXISTING_CUSTOMERS" to "Existing customers", "IN_STORE" to "In store")
+
+private fun share(context: android.content.Context, title: String, path: String) {
+    val url = com.suvrnika.app.BuildConfig.API_BASE_URL.trimEnd('/') + path
+    val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, title).putExtra(Intent.EXTRA_TEXT, "$title\n$url")
+    runCatching { context.startActivity(Intent.createChooser(send, "Share").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+}
+
+/** Article/offer text: blank lines separate paragraphs. */
+@Composable
+private fun Paragraphs(text: String) {
+    text.split(Regex("\\n\\s*\\n")).map { it.trim() }.filter { it.isNotEmpty() }.forEach { para ->
+        Text(para, color = Brand.Ink.copy(alpha = 0.86f), fontSize = 16.sp, lineHeight = 26.sp, modifier = Modifier.padding(bottom = 12.dp))
+    }
+}
+
 @Composable
 fun OffersScreen() {
     val nav = LocalNav.current
     val state = rememberLoad { call { offers() } }
-    LoadList(state) { res ->
-        item { Column { Eyebrow("Promotional announcements"); Heading("Current offers"); Muted("Published offers are announcements and apply only as their terms state.") } }
-        if (res.offers.isEmpty()) item { Muted("There are no active promotional offers right now.") }
-        items(res.offers, key = { it.id }) { o ->
-            Panel(Modifier.clickable { nav.navigate("offer/${o.slug}") }) {
-                Eyebrow("Ends ${date(o.endsAt)}")
-                Text(o.title, style = MaterialTheme.typography.headlineSmall)
-                Text(o.summary, color = Brand.Body, fontSize = 14.sp)
-                Text("Details & terms →", color = Brand.Gold, fontWeight = FontWeight.SemiBold)
-            }
-        }
+    LoadGrid(state, minCell = 300.dp) { res ->
+        full("head") { Column { Eyebrow("Promotional announcements"); Heading("Current offers"); Muted("Each offer applies only as its terms state.") } }
+        if (res.offers.isEmpty()) full("empty") { Muted("There are no active promotional offers right now. Check back soon.") }
+        items(res.offers, key = { it.id }) { o -> OfferCard(o, onOpen = { nav.navigate("offer/${o.slug}") }) }
     }
 }
 
 @Composable
 fun OfferScreen(slug: String) {
+    val nav = LocalNav.current
+    val context = LocalContext.current
     val state = rememberLoad(slug) { call { offer(slug) }.offer }
+    var terms by rememberSaveable { mutableStateOf(false) }
     LoadList(state) { o ->
-        item { Column { Eyebrow("${date(o.startsAt)} – ${date(o.endsAt)}"); Heading(o.title) } }
-        item { Text(o.body, color = Brand.Body) }
-        item { Panel { Text("Terms", fontWeight = FontWeight.Bold); Text(o.terms, color = Brand.Body, fontSize = 13.sp) } }
+        item {
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Brush.linearGradient(listOf(Color(0xFFB88A3E), Brand.Gold, Brand.GoldDark))).padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Eyebrow(endsIn(o.endsAt) ?: "Offer", Brand.GoldSoft)
+                Text(o.title, style = MaterialTheme.typography.displaySmall, color = Color.White)
+                if (o.summary.isNotBlank()) Text(o.summary, color = Color.White.copy(alpha = 0.9f), fontSize = 15.sp, lineHeight = 21.sp)
+                Text("${date(o.startsAt)} – ${date(o.endsAt)} · For ${AUDIENCE[o.audience] ?: "everyone"}", color = Brand.GoldSoft, fontSize = 12.sp)
+            }
+        }
+        item { Paragraphs(o.body) }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                PrimaryButton(o.ctaLabel.ifBlank { "Shop now" }, gold = true, modifier = Modifier.weight(1f), onClick = {
+                    if (o.ctaUrl.isNotBlank()) openStoreLink(nav, context, o.ctaUrl) else nav.navigate("shop")
+                })
+                GhostButton("Share", onClick = { share(context, o.title, "/journal/offers/${o.slug}") })
+            }
+        }
+        item {
+            Panel {
+                Row(Modifier.fillMaxWidth().clickable { terms = !terms }, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Terms & conditions", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text(if (terms) "Hide" else "Read", color = Brand.Gold, fontWeight = FontWeight.SemiBold)
+                }
+                if (terms) Text(o.terms, color = Brand.Body, fontSize = 13.sp, lineHeight = 19.sp)
+            }
+        }
     }
 }
 
@@ -198,25 +257,45 @@ fun OfferScreen(slug: String) {
 fun JournalScreen() {
     val nav = LocalNav.current
     val state = rememberLoad { call { journal() } }
-    LoadList(state) { res ->
-        item { Column { Eyebrow("Journal"); Heading("Stories & guides") } }
-        if (res.posts.isEmpty()) item { Muted("No articles yet.") }
-        items(res.posts, key = { it.id }) { p ->
-            Panel(Modifier.clickable { nav.navigate("post/${p.slug}") }) {
-                Eyebrow(date(p.publishedAt))
-                Text(p.title, style = MaterialTheme.typography.headlineSmall)
-                Text(p.summary, color = Brand.Body, fontSize = 14.sp)
-            }
-        }
+    LoadGrid(state, minCell = 280.dp) { res ->
+        full("head") { Column { Eyebrow("Journal"); Heading("Stories & guides"); Muted("Buying guides, care tips and the stories behind our pieces.") } }
+        if (res.posts.isEmpty()) full("empty") { Muted("No articles yet. Check back soon.") }
+        res.posts.firstOrNull()?.let { first -> full(first.id) { JournalCard(first, onOpen = { nav.navigate("post/${first.slug}") }, featured = true) } }
+        items(res.posts.drop(1), key = { it.id }) { p -> JournalCard(p, onOpen = { nav.navigate("post/${p.slug}") }) }
     }
 }
 
+private class Article(val post: com.suvrnika.app.data.Post, val more: List<com.suvrnika.app.data.Post>)
+
 @Composable
 fun PostScreen(slug: String) {
-    val state = rememberLoad(slug) { call { post(slug) }.post }
-    LoadList(state) { p ->
-        item { Column { Eyebrow(listOfNotNull(p.author.ifBlank { null }, date(p.publishedAt)).joinToString(" · ")); Heading(p.title) } }
-        item { Text(p.body, color = Brand.Body, lineHeight = 22.sp) }
+    val nav = LocalNav.current
+    val context = LocalContext.current
+    val state = rememberLoad(slug) {
+        coroutineScope {
+            val post = async { call { post(slug) }.post }
+            val all = async { runCatching { call { journal() }.posts }.getOrDefault(emptyList()) }
+            Article(post.await(), all.await().filter { it.slug != slug }.take(3))
+        }
+    }
+    LoadList(state) { a ->
+        val p = a.post
+        item { JournalCover(p, Modifier.fillMaxWidth().aspectRatio(2f), big = true) }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Eyebrow(listOfNotNull(date(p.publishedAt).takeIf { it != "—" }, "${readMinutes(p.body)} min read").joinToString(" · "))
+                Text(p.title, style = MaterialTheme.typography.displaySmall)
+                if (p.author.isNotBlank()) Muted("By ${p.author}")
+                if (p.summary.isNotBlank()) Text(p.summary, style = MaterialTheme.typography.titleLarge, fontStyle = FontStyle.Italic, color = Brand.Body)
+                Divider()
+            }
+        }
+        item { Paragraphs(p.body) }
+        item { GhostButton("Share this story", onClick = { share(context, p.title, "/journal/${p.slug}") }, modifier = Modifier.fillMaxWidth()) }
+        if (a.more.isNotEmpty()) {
+            item { SectionHeader("Keep reading", "More from the journal", "All stories") { nav.navigate("journal") } }
+            items(a.more, key = { it.id }) { m -> JournalCard(m, onOpen = { nav.navigate("post/${m.slug}") }) }
+        }
     }
 }
 
