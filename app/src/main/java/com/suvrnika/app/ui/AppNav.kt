@@ -1,6 +1,11 @@
 package com.suvrnika.app.ui
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -33,8 +38,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.suvrnika.app.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -149,7 +160,16 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
             snackbarHost = { SnackbarHost(snack) },
             topBar = {
                 if (isTab) TopAppBar(
-                    title = { Text(config?.company?.name ?: "SUVRNIKA", fontWeight = FontWeight.SemiBold) },
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Image(
+                                painter = painterResource(R.drawable.ic_app_logo),
+                                contentDescription = "Suvrnika Logo",
+                                modifier = Modifier.size(34.dp).clip(RoundedCornerShape(6.dp))
+                            )
+                            Text(config?.company?.name ?: "SUVRNIKA", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        }
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Brand.Ivory),
                 ) else TopAppBar(
                     title = { Text(TITLES[route] ?: "") },
