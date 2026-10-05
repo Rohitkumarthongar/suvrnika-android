@@ -58,7 +58,7 @@ import com.suvrnika.app.util.rupeesToPaise
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private const val MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+private const val MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
 // ---------------------------------------------------------------- profile & KYC
 @Composable
@@ -152,9 +152,9 @@ private suspend fun readUpload(context: Context, uri: Uri): Upload = withContext
             if (!cur.isNull(1)) size = cur.getLong(1)
         }
     }
-    if (size > MAX_UPLOAD_BYTES) throw ApiException("File must be under 5 MB.")
+    if (size > MAX_UPLOAD_BYTES) throw ApiException("File must be under 15 MB.")
     val bytes = cr.openInputStream(uri)?.use { it.readBytes() } ?: throw ApiException("Could not read that file.")
-    if (bytes.size > MAX_UPLOAD_BYTES) throw ApiException("File must be under 5 MB.")
+    if (bytes.size > MAX_UPLOAD_BYTES) throw ApiException("File must be under 15 MB.")
     Upload(name, cr.getType(uri) ?: "application/octet-stream", bytes)
 }
 
