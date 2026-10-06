@@ -91,6 +91,7 @@ import com.suvrnika.app.ui.components.Heading
 import com.suvrnika.app.ui.components.HeroCarousel
 import com.suvrnika.app.ui.components.ItemImage
 import com.suvrnika.app.ui.components.ItemRail
+import com.suvrnika.app.ui.components.ProductGridSection
 import com.suvrnika.app.ui.components.JournalCard
 import com.suvrnika.app.ui.components.KeyValue
 import com.suvrnika.app.ui.components.LoadGrid
@@ -275,7 +276,7 @@ fun HomeScreen() {
         if (pieces.size > 1) item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionHeader("Just in", "New arrivals", "Shop new") { nav.navigate("shop") }
-                ItemRail(pieces.reversed().take(8), open, wish)
+                ProductGridSection(pieces.reversed().take(6), open, wish)
             }
         }
         if (home.posts.isNotEmpty()) item {

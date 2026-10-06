@@ -136,6 +136,22 @@ fun ItemRail(pieces: List<Item>, onOpen: (Item) -> Unit, onWish: ((Item) -> Unit
     }
 }
 
+/** 2-column grid section for displaying multiple items cleanly inside lazy lists. */
+@Composable
+fun ProductGridSection(pieces: List<Item>, onOpen: (Item) -> Unit, onWish: ((Item) -> Unit)?) {
+    val rows = pieces.chunked(2)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        rows.forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { item ->
+                    ProductCard(item, onOpen = { onOpen(item) }, onWish = onWish?.let { f -> { f(item) } }, modifier = Modifier.weight(1f))
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------- hero carousel
 /** One slide of the home carousel. */
 data class Slide(
