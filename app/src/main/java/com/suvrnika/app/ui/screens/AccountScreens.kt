@@ -41,6 +41,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.suvrnika.app.ui.components.LocalConfig
 import com.suvrnika.app.util.rupeesToPaise
+import com.suvrnika.app.util.metalLabel
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -188,6 +189,16 @@ private fun Options(values: List<Pair<String, String>>, selected: String, onPick
 }
 
 // ---------------------------------------------------------------- wallet
+/**
+ * Digital metals the store deals in, from Admin → Company setup → Metals: gold when it sells gold or diamond
+ * jewellery (diamond pieces are priced on the gold rate), silver when it sells silver.
+ */
+@Composable
+fun walletMetals(): List<String> {
+    val sold = offeredMetals()
+    return listOfNotNull("GOLD".takeIf { "GOLD" in sold || "DIAMOND" in sold }, "SILVER".takeIf { "SILVER" in sold })
+}
+
 @Composable
 fun WalletScreen() {
     val repo = LocalRepo.current
@@ -196,7 +207,9 @@ fun WalletScreen() {
     val runner = rememberRunner()
     val buyKey = rememberActionKey()
     val state = rememberLoad { call { wallet() } }
-    var metal by rememberSaveable { mutableStateOf("GOLD") }
+    val metals = walletMetals()
+    var picked by rememberSaveable { mutableStateOf("GOLD") }
+    val metal = picked.takeIf { it in metals } ?: metals.firstOrNull() ?: "GOLD"
     var amount by rememberSaveable { mutableStateOf(5000L) }
     var pts by rememberSaveable { mutableStateOf("1000") }
     var sellMg by rememberSaveable { mutableStateOf(500L) }
@@ -208,9 +221,10 @@ fun WalletScreen() {
                 Eyebrow("Total wallet value", Brand.GoldLight)
                 Text(inr(w.totalValuePaise), style = MaterialTheme.typography.displaySmall, color = Brand.Cream)
                 Text("At today's rate · cash, points, metal and plan balance", color = Brand.EmeraldText, fontSize = 12.sp)
-                val tiles = listOf(
-                    Triple("Gold 24K", grams(b.goldMg), "≈ " + inr(w.values.goldPaise)),
-                    Triple("Silver 999", grams(b.silverMg), "≈ " + inr(w.values.silverPaise)),
+                // A metal the store no longer deals in is still shown while the customer holds some.
+                val tiles = listOfNotNull(
+                    Triple("Gold 24K", grams(b.goldMg), "≈ " + inr(w.values.goldPaise)).takeIf { "GOLD" in metals || b.goldMg > 0 },
+                    Triple("Silver 999", grams(b.silverMg), "≈ " + inr(w.values.silverPaise)).takeIf { "SILVER" in metals || b.silverMg > 0 },
                     Triple("Points", count(b.points), "1 point = ${inr(w.points.pointValuePaise)}" + if (w.points.expiryMonths > 0) " · valid ${w.points.expiryMonths} mo" else ""),
                     Triple("Plan balance", inr(b.schemeCreditPaise), "For jewellery"),
                     Triple("Cash", inr(b.cashPaise), "From sales & refunds"),
@@ -229,10 +243,10 @@ fun WalletScreen() {
                 }
             }
         }
-        item {
+        if (metals.isNotEmpty()) item {
             Panel {
-                Text("Buy digital metal", style = MaterialTheme.typography.headlineSmall)
-                Options(listOf("GOLD" to "Gold", "SILVER" to "Silver"), metal) { metal = it }
+                Text(if (metals.size == 1) "Buy digital ${metals[0].lowercase()}" else "Buy digital metal", style = MaterialTheme.typography.headlineSmall)
+                if (metals.size > 1) Options(metals.map { it to metalLabel(it) }, metal) { picked = it }
                 Options(listOf(1000L, 5000L, 10000L).map { it.toString() to inr(it * 100) }, amount.toString()) { amount = it.toLong() }
                 val rate = if (metal == "GOLD") w.rates.goldPaisePerGram else w.rates.silverPaisePerGram
                 Text("You receive ${grams(if (rate > 0) amount * 100 * 1000 / rate else 0L)} of ${metal.lowercase()}, rate locked at ${inr(rate)}/g.", color = Brand.Body, fontSize = 14.sp)
@@ -250,7 +264,7 @@ fun WalletScreen() {
                 })
             }
         }
-        item {
+        if ("GOLD" in metals && w.points.convertToGold) item {
             Panel {
                 Text("Points into gold", style = MaterialTheme.typography.headlineSmall)
                 Options(listOf("500" to "500", "1000" to "1,000", "all" to "All"), pts) { pts = it }
@@ -263,7 +277,7 @@ fun WalletScreen() {
                 })
             }
         }
-        item {
+        if ("GOLD" in metals || b.goldMg > 0) item {
             Panel {
                 Text("Sell gold to cash", style = MaterialTheme.typography.headlineSmall)
                 Options(listOf(100L, 500L, 1000L).map { it.toString() to "%.1f g".format(it / 1000.0) }, sellMg.toString()) { sellMg = it.toLong() }
@@ -589,7 +603,9 @@ fun TradingScreen() {
     val signedIn by repo.tokens.signedIn.collectAsState()
     if (!signedIn) return SignInPrompt("Sign in to trade digital gold and silver.")
     val state = rememberLoad { call { trading() } }
-    var metal by rememberSaveable { mutableStateOf("GOLD") }
+    val metals = walletMetals()
+    var picked by rememberSaveable { mutableStateOf("GOLD") }
+    val metal = picked.takeIf { it in metals } ?: metals.firstOrNull() ?: "GOLD"
     var amount by rememberSaveable { mutableStateOf("") }
     var cancelling by remember { mutableStateOf<com.suvrnika.app.data.TradeRequest?>(null) }
 
@@ -610,7 +626,7 @@ fun TradingScreen() {
                     Chip(if (win.open) "Open now" else if (win.weekend) "Closed · weekend" else "Closed · opens ${win.start}", if (win.open) Tone.Ok else Tone.Bad)
                 }
                 Muted("Trading hours ${win.start}–${win.end} IST, Monday–Friday.")
-                Options(listOf("GOLD" to "Gold", "SILVER" to "Silver"), metal) { metal = it }
+                if (metals.size > 1) Options(metals.map { it to metalLabel(it) }, metal) { picked = it }
                 val quick = listOf(1000L, 5000L, 10000L)
                 val paise = rupeesToPaise(amount) ?: maxOf(100000L, t.minAmountPaise)
                 Options(quick.map { it.toString() to inr(it * 100) }, (paise / 100).toString()) { amount = it }

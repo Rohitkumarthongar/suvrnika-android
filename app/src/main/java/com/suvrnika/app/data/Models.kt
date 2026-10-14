@@ -31,7 +31,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class Company(
     val name: String = "SUVRNIKA", val tag: String = "", val legal: String = "", val logoUrl: String = "", val address: String = "",
     val phone: String = "", val whatsapp: String = "", val email: String = "", val hours: String = "", val gstin: String = "", val bis: String = "",
-    val announce: String = "", val hero1: String = "", val hero2: String = "", val heroImg: String = "",
+    val announce: String = "", val hero1: String = "", val hero2: String = "", val heroImg: String = "", val heroBody: String = "", val heroCta: String = "",
     /** Metals the store sells (Admin → Company setup → Metals & purities); pieces in other metals are hidden. */
     val metals: List<String> = listOf("GOLD", "DIAMOND", "SILVER"),
 )
