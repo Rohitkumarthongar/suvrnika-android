@@ -124,6 +124,10 @@ private val TITLES = mapOf(
 /** Screens that show the Men | Women switch under the header (the storefront views). */
 private val VIEW_ROUTES = setOf("home", "shop")
 
+/** The Shop destination's full route (its filters are optional arguments). */
+private const val SHOP_ROUTE = "shop?metal={metal}&cat={cat}&tag={tag}&band={band}&q={q}"
+private fun routePattern(tab: String) = if (tab == "shop") SHOP_ROUTE else tab
+
 /** Screens with the floating calculator button. */
 private val FAB_ROUTES = setOf("home", "shop", "wishlist")
 
@@ -234,7 +238,13 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
                         NavigationBarItem(
                             selected = route == t.route,
                             onClick = {
-                                nav.navigate(t.route) {
+                                // Home always clears back to the home page. Restoring Home's "saved state" would put back
+                                // the screens opened from it (a category, a product), so tapping Home seemed to do nothing.
+                                if (t.route == "home") nav.popBackStack("home", inclusive = false)
+                                // Tapping the tab you are in (e.g. Shop while on a product opened from Shop) returns to its first screen.
+                                else if (runCatching { nav.getBackStackEntry(routePattern(t.route)) }.isSuccess) nav.popBackStack(routePattern(t.route), inclusive = false)
+                                // Other tabs keep their place, like the website keeps each page.
+                                else nav.navigate(t.route) {
                                     popUpTo("home") { saveState = true }
                                     launchSingleTop = true
                                     restoreState = true
@@ -254,7 +264,7 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
             NavHost(nav, startDestination = "home", modifier = Modifier.padding(pad)) {
                 composable("home") { HomeScreen() }
                 composable(
-                    "shop?metal={metal}&cat={cat}&tag={tag}&band={band}&q={q}",
+                    SHOP_ROUTE,
                     arguments = listOf("metal", "cat", "tag", "band", "q").map { navArgument(it) { type = NavType.StringType; nullable = true; defaultValue = null } },
                 ) { e ->
                     val a = e.arguments
