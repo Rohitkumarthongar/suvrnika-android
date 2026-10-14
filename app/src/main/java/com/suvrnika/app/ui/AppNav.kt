@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Calculate
 import com.suvrnika.app.ui.components.GenderSwitch
 import com.suvrnika.app.ui.components.OfferPopupHost
 import com.suvrnika.app.ui.theme.Display
@@ -119,6 +120,9 @@ private val TITLES = mapOf(
 /** Screens that show the Men | Women switch under the header (the storefront views). */
 private val VIEW_ROUTES = setOf("home", "shop")
 
+/** Screens with the floating calculator button. */
+private val FAB_ROUTES = setOf("home", "shop", "wishlist")
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme {
@@ -128,8 +132,11 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
     val toast: (String) -> Unit = remember { { msg -> scope.launch { snack.showSnackbar(msg) } } }
     val signedIn by repo.tokens.signedIn.collectAsState()
     val bagTick = remember { mutableIntStateOf(0) }
-    val config by androidx.compose.runtime.produceState<com.suvrnika.app.data.AppConfig?>(null, signedIn) {
-        value = runCatching { repo.call { config() } }.getOrNull()
+    // Company setup (logo, name, metals, popup, rules…) is fetched again every time the app comes back to
+    // the foreground, so changes made in Admin show up without reinstalling. A failed refresh keeps the last value.
+    val configTick = remember { mutableIntStateOf(0) }
+    val config by androidx.compose.runtime.produceState<com.suvrnika.app.data.AppConfig?>(null, signedIn, configTick.intValue) {
+        runCatching { repo.call { config() } }.getOrNull()?.let { value = it }
     }
     val bagCount by androidx.compose.runtime.produceState(0, signedIn, bagTick.intValue) {
         value = runCatching { repo.call { bag() }.count }.getOrDefault(0)
@@ -141,6 +148,7 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
         val obs = LifecycleEventObserver { _, e ->
             if (e == Lifecycle.Event.ON_RESUME) scope.launch {
                 bagTick.intValue++
+                configTick.intValue++
                 payments.reconcilePending()?.let { s ->
                     toast(if (s.status == "PAID") "Your payment of ${inr(s.amountPaise)} was successful." else "A payment was not completed. Nothing was charged.")
                 }
@@ -170,11 +178,24 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
         val isTab = TABS.any { it.route == route }
         Scaffold(
             snackbarHost = { SnackbarHost(snack) },
+            // Metal value calculator, one tap away on the storefront screens.
+            floatingActionButton = {
+                if (route in FAB_ROUTES) androidx.compose.material3.FloatingActionButton(
+                    onClick = { nav.navigate("calculator") { launchSingleTop = true } },
+                    containerColor = Brand.Ink, contentColor = Brand.Ivory, shape = androidx.compose.foundation.shape.CircleShape,
+                ) { Icon(androidx.compose.material.icons.Icons.Outlined.Calculate, contentDescription = "Metal value calculator") }
+            },
             topBar = { Column {
                 if (isTab) TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Image(
+                            // The logo from Admin → Company setup; the built-in mark until one is uploaded (or while it loads).
+                            val logo = repo.imageUrl(config?.company?.logoUrl)
+                            if (logo != null) coil.compose.AsyncImage(
+                                model = logo, contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                                placeholder = painterResource(R.drawable.ic_app_logo), error = painterResource(R.drawable.ic_app_logo),
+                                modifier = Modifier.size(width = 56.dp, height = 40.dp),
+                            ) else Image(
                                 painter = painterResource(R.drawable.ic_app_logo),
                                 contentDescription = null,
                                 modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)),

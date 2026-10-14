@@ -160,6 +160,15 @@ private val GENDER_HERO = mapOf(
     "WOMEN" to listOf("For her · The women's edit", "Grace in", "every detail.", "Necklaces, jhumkas, bangles and solitaires for every occasion, priced at today's rate.", "Shop women's jewellery"),
 )
 
+/** How many pieces the home rails and the new-arrivals grid show. */
+private const val HOME_RAIL = 12
+private const val HOME_GRID = 10
+/** Fewest pieces a Men / Women home page shows before it is topped up with other pieces. */
+private const val HOME_MIN = 10
+
+/** The server's Men / Women rule (src/lib/gender.ts fitsGender): the common view shows everything. */
+fun Item.fitsView(view: String?) = view == null || gender == view || gender == "UNISEX"
+
 /** Metals the store sells (Admin → Company setup), in the storefront's order. */
 @Composable
 fun offeredMetals(): List<String> = LocalConfig.current?.company?.metals?.let { m -> listOf("GOLD", "DIAMOND", "SILVER").filter { it in m } }?.ifEmpty { null }
@@ -173,9 +182,11 @@ fun HomeScreen() {
     val runner = rememberRunner()
     val gender = StoreView.gender
     val metals = offeredMetals()
-    val state = rememberLoad(gender) {
+    // Every piece is loaded once and the Men / Women view is applied here (the server's rule: that gender plus
+    // unisex), so switching views is instant and the home page can top up a thin view with other pieces.
+    val state = rememberLoad {
         coroutineScope {
-            val cat = async { call { catalogue(gender = gender) } }
+            val cat = async { call { catalogue() } }
             // Offers, articles and the price strip are extras: the home page still loads if any is unavailable.
             val offers = async { runCatching { call { offers() }.offers }.getOrDefault(emptyList()) }
             val posts = async { runCatching { call { journal() }.posts }.getOrDefault(emptyList()) }
@@ -187,7 +198,10 @@ fun HomeScreen() {
     val wish = { i: Item -> runner.toggleWish(repo, i, state::refresh) }
 
     LoadList(state) { home ->
-        val pieces = home.catalogue.items
+        val all = home.catalogue.items
+        val pieces = all.filter { it.fitsView(gender) }
+        // A thin Men / Women view still shows at least HOME_MIN pieces: the rest come from the other pieces.
+        val topUp = if (gender != null && pieces.size < HOME_MIN) (all - pieces.toSet()).take(HOME_RAIL - pieces.size) else emptyList()
         val company = cfg?.company
         if (!company?.announce.isNullOrBlank()) item {
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Brand.Emerald).padding(horizontal = 16.dp, vertical = 9.dp), horizontalArrangement = Arrangement.Center) {
@@ -209,8 +223,8 @@ fun HomeScreen() {
                 else add(Slide(
                     eyebrow = "The festive edit · ${java.time.Year.now().value}", title = company?.hero1?.ifBlank { null } ?: "Heirlooms,",
                     emphasis = company?.hero2?.ifBlank { null } ?: "made for every day.",
-                    body = "Hallmarked gold, certified diamonds and sterling silver — priced openly at today's rate.",
-                    cta = "Shop the collection", imageUrl = company?.heroImg?.ifBlank { null }, onClick = { nav.navigate("shop") },
+                    body = company?.heroBody?.ifBlank { null } ?: "Hallmarked gold, certified diamonds and sterling silver — priced openly at today's rate.",
+                    cta = company?.heroCta?.ifBlank { null } ?: "Shop the collection", imageUrl = company?.heroImg?.ifBlank { null }, onClick = { nav.navigate("shop") },
                 ))
                 home.offers.take(3).forEach { o ->
                     add(Slide(eyebrow = endsIn(o.endsAt) ?: "Offer", title = o.title, body = o.summary, cta = o.ctaLabel.ifBlank { "View offer" },
@@ -278,11 +292,21 @@ fun HomeScreen() {
         if (pieces.isNotEmpty()) item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionHeader(gender?.let { "${StoreView.LABEL[it]}'s bestsellers" } ?: "Bestsellers", "Loved this season", "View all") { nav.navigate("shop") }
-                ItemRail(pieces.take(8), open, wish)
+                ItemRail(pieces.take(HOME_RAIL), open, wish)
+            }
+        }
+        if (topUp.isNotEmpty()) item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SectionHeader("More to explore", "You may also like", "All jewellery") { StoreView.set(null); nav.navigate("shop") }
+                ItemRail(topUp, open, wish)
             }
         }
         item {
-            GenderEditCards(cfg?.homeImages?.her?.firstOrNull(), cfg?.homeImages?.him?.firstOrNull()) { nav.navigate("shop") { launchSingleTop = true } }
+            // The owner's For her / For him photos; until they are uploaded, a photo of a piece made for that view.
+            fun photo(g: String, uploaded: List<String>?) = uploaded?.firstOrNull()
+                ?: all.firstOrNull { it.gender == g && !it.imageUrl.isNullOrBlank() }?.imageUrl
+                ?: all.firstOrNull { it.fitsView(g) && !it.imageUrl.isNullOrBlank() }?.imageUrl
+            GenderEditCards(photo("WOMEN", cfg?.homeImages?.her), photo("MEN", cfg?.homeImages?.him)) { nav.navigate("shop") { launchSingleTop = true } }
         }
         cfg?.popup?.takeIf { it.headline.isNotBlank() }?.let { p ->
             item {
@@ -305,10 +329,10 @@ fun HomeScreen() {
                 }
             }
         }
-        if (pieces.size > 1) item {
+        if (pieces.isNotEmpty()) item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionHeader("Just in", "New arrivals", "Shop new") { nav.navigate("shop") }
-                ProductGridSection(pieces.reversed().take(6), open, wish)
+                ProductGridSection(pieces.sortedByDescending { it.createdAt.orEmpty() }.take(HOME_GRID), open, wish)
             }
         }
         if (home.posts.isNotEmpty()) item {
@@ -323,7 +347,7 @@ fun HomeScreen() {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 listOf(
                     Triple("Showrooms", Icons.Outlined.LocationOn, "stores"),
-                    Triple("Calculator", Icons.Outlined.Calculate, "calculator"),
+                    Triple("Offers", Icons.Outlined.LocalOffer, "offers"),
                     Triple("Help", Icons.Outlined.SupportAgent, "help"),
                 ).forEach { (label, icon, route) ->
                     Column(
@@ -342,6 +366,11 @@ fun HomeScreen() {
 }
 
 // ---------------------------------------------------------------- shop
+/** Fewest pieces a Men / Women shop page shows before other pieces are added below. */
+private const val SHOP_MIN = 10
+
+private class ShopData(val res: CatalogueResponse, val more: List<Item>)
+
 private val METALS = listOf(null to "All", "GOLD" to "Gold", "DIAMOND" to "Diamond", "SILVER" to "Silver")
 private val SORTS = listOf(null to "Featured", "newest" to "Newest", "price_asc" to "Price: low to high", "price_desc" to "Price: high to low")
 
@@ -363,13 +392,20 @@ fun ShopScreen(metal0: String?, cat0: String?, tag0: String?, band0: String?, q0
     val gender = StoreView.gender
     val metals = offeredMetals()
     val state = rememberLoad(metal, cat, band, sort, applied, tag, gender) {
-        call { catalogue(metal, cat, tag, band, applied.ifBlank { null }, sort, gender) }
+        val res = call { catalogue(metal, cat, tag, band, applied.ifBlank { null }, sort, gender) }
+        // A Men / Women view with few matches is topped up below with other pieces for the same filters.
+        val more = if (gender == null || res.items.size >= SHOP_MIN) emptyList() else {
+            val shown = res.items.map { it.id }.toSet()
+            runCatching { call { catalogue(metal, cat, tag, band, applied.ifBlank { null }, sort) }.items.filter { it.id !in shown } }.getOrDefault(emptyList())
+        }
+        ShopData(res, more)
     }
     val categories = cfg?.categories.orEmpty()
-    val bands = state.data?.bands.orEmpty()
+    val bands = state.data?.res?.bands.orEmpty()
     val activeCount = listOfNotNull(cat, band, sort, tag).size
 
-    LoadGrid(state) { res ->
+    LoadGrid(state) { data ->
+        val res = data.res
         full("search") {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
@@ -413,6 +449,10 @@ fun ShopScreen(metal0: String?, cat0: String?, tag0: String?, band0: String?, q0
             }
         }
         items(res.items, key = { it.id }) { i -> ProductCard(i, onOpen = { nav.navigate("product/${i.sku}") }, onWish = { runner.toggleWish(repo, i, state::refresh) }) }
+        if (data.more.isNotEmpty()) {
+            full("more") { SectionHeader("More to explore", "You may also like", "All jewellery") { StoreView.set(null) } }
+            items(data.more, key = { "more-" + it.id }) { i -> ProductCard(i, onOpen = { nav.navigate("product/${i.sku}") }, onWish = { runner.toggleWish(repo, i, state::refresh) }) }
+        }
     }
 
     if (sheet) ModalBottomSheet(onDismissRequest = { sheet = false }, containerColor = Brand.Ivory) {
@@ -423,7 +463,7 @@ fun ShopScreen(metal0: String?, cat0: String?, tag0: String?, band0: String?, q0
             FilterGroup("Sort by", SORTS, sort) { sort = it }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GhostButton("Clear all", onClick = { cat = null; band = null; sort = null; tag = null }, modifier = Modifier.weight(1f))
-                PrimaryButton("Show ${state.data?.items?.size ?: 0} pieces", onClick = { sheet = false }, modifier = Modifier.weight(1f))
+                PrimaryButton("Show ${state.data?.res?.items?.size ?: 0} pieces", onClick = { sheet = false }, modifier = Modifier.weight(1f))
             }
         }
     }
