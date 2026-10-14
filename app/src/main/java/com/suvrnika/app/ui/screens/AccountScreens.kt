@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Savings
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material3.AlertDialog
@@ -122,6 +123,7 @@ fun AccountScreen() {
         Triple("offers", "Current offers", Icons.Outlined.LocalOffer),
         Triple("journal", "Journal", Icons.Outlined.MenuBook),
         Triple("help", "Help & support", Icons.Outlined.HelpOutline),
+        Triple("settings", "App settings & updates", Icons.Outlined.Settings),
     )
     if (!signedIn) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {

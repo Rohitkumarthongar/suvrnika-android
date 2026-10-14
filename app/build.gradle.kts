@@ -6,6 +6,14 @@ plugins {
 }
 
 val apiUrl = (project.findProperty("suvrnikaApiUrl") as String? ?: "http://10.0.2.2:3000/").let { if (it.endsWith("/")) it else "$it/" }
+// Set by the release workflow (.github/workflows/release.yml); local builds stay at 1 so any published release is newer.
+val appVersionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 1
+val appVersionName = project.findProperty("appVersionName") as String? ?: "1.0.0"
+// Public GitHub repository whose releases the app offers as updates.
+val updateRepo = project.findProperty("updateRepo") as String? ?: "Rohitkumarthongar/suvrnika-android"
+// Release signing from the environment (the workflow decodes the keystore from a secret). Every release must be
+// signed with the same key, or Android refuses to install it over the app already on the phone.
+val keystorePath: String? = System.getenv("SUVRNIKA_KEYSTORE_FILE")
 
 android {
     namespace = "com.suvrnika.app"
@@ -15,9 +23,19 @@ android {
         applicationId = "com.suvrnika.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
         buildConfigField("String", "API_BASE_URL", "\"$apiUrl\"")
+        buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
+    }
+
+    signingConfigs {
+        if (keystorePath != null) create("release") {
+            storeFile = file(keystorePath)
+            storePassword = System.getenv("SUVRNIKA_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("SUVRNIKA_KEY_ALIAS")
+            keyPassword = System.getenv("SUVRNIKA_KEY_PASSWORD")
+        }
     }
 
     buildTypes {
@@ -25,6 +43,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             // Release builds must point at an https:// server (cleartext is only allowed in debug builds).
         }
     }

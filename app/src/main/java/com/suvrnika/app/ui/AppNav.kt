@@ -11,6 +11,10 @@ import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Calculate
 import com.suvrnika.app.ui.components.GenderSwitch
+import com.suvrnika.app.ui.components.LocalUpdates
+import com.suvrnika.app.ui.components.UpdateController
+import com.suvrnika.app.ui.components.UpdateDialog
+import com.suvrnika.app.ui.screens.SettingsScreen
 import com.suvrnika.app.ui.components.OfferPopupHost
 import com.suvrnika.app.ui.theme.Display
 import androidx.compose.foundation.layout.size
@@ -114,7 +118,7 @@ private val TITLES = mapOf(
     "product" to "", "login" to "Sign in", "wallet" to "Wallet", "history" to "Complete history", "plans" to "Savings plans",
     "orders" to "Orders", "order" to "Order", "invoices" to "Invoices", "payments" to "Payment methods", "profile" to "Profile & KYC",
     "stores" to "Find a showroom", "calculator" to "Metal value calculator", "offers" to "Current offers", "offer" to "Offer",
-    "journal" to "Journal", "post" to "Journal", "help" to "Help & support", "trading" to "Trading",
+    "journal" to "Journal", "post" to "Journal", "help" to "Help & support", "trading" to "Trading", "settings" to "App settings",
 )
 
 /** Screens that show the Men | Women switch under the header (the storefront views). */
@@ -130,6 +134,8 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
     val snack = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val toast: (String) -> Unit = remember { { msg -> scope.launch { snack.showSnackbar(msg) } } }
+    val updates = remember { UpdateController(repo.updater, scope, toast) }
+    LaunchedEffect(Unit) { updates.autoCheck() }
     val signedIn by repo.tokens.signedIn.collectAsState()
     val bagTick = remember { mutableIntStateOf(0) }
     // Company setup (logo, name, metals, popup, rules…) is fetched again every time the app comes back to
@@ -149,6 +155,7 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
             if (e == Lifecycle.Event.ON_RESUME) scope.launch {
                 bagTick.intValue++
                 configTick.intValue++
+                updates.onResume()
                 payments.reconcilePending()?.let { s ->
                     toast(if (s.status == "PAID") "Your payment of ${inr(s.amountPaise)} was successful." else "A payment was not completed. Nothing was charged.")
                 }
@@ -171,7 +178,7 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
 
     CompositionLocalProvider(
         LocalRepo provides repo, LocalPayments provides payments, LocalNav provides nav, LocalToast provides toast,
-        LocalConfig provides config, LocalBagChanged provides { bagTick.intValue++ },
+        LocalConfig provides config, LocalBagChanged provides { bagTick.intValue++ }, LocalUpdates provides updates,
     ) {
         val entry by nav.currentBackStackEntryAsState()
         val route = entry?.destination?.route?.substringBefore("/")?.substringBefore("?") ?: "home"
@@ -274,8 +281,11 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
                 composable("post/{slug}") { e -> PostScreen(e.arguments?.getString("slug").orEmpty()) }
                 composable("help") { HelpScreen() }
                 composable("trading") { TradingScreen() }
+                composable("settings") { SettingsScreen() }
             }
         }
-        OfferPopupHost(currentRoute = route, blocked = mock != null)
+        // The update pop-up wins over the promotional pop-up.
+        OfferPopupHost(currentRoute = route, blocked = mock != null || updates.showDialog)
+        UpdateDialog(updates)
     }
 }

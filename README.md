@@ -55,6 +55,30 @@ Release builds allow HTTPS only. Cleartext HTTP is allowed only in debug builds,
 `10.0.2.2`, `localhost` and `127.0.0.1`. Sign the release APK/AAB with your own keystore. Keystores
 are git-ignored. The GitHub Actions workflow `.github/workflows/android.yml` builds the debug APK on every change.
 
+## Releases, app icon and updates
+
+`.github/workflows/release.yml` builds a signed APK and publishes it as a GitHub release of this (public)
+repository. It runs when app code is pushed to `main`, when it is started from the Actions tab, and when the
+store's logo or app icon changes in Admin → Company setup (the server sends `app-icon-changed` when
+`ANDROID_BUILD_TOKEN` is set). Before building it runs `scripts/brand_icon.py`, so the launcher icon is always the
+store's current app icon (or logo).
+
+The app checks the latest release on launch and when it returns to the foreground (at most every 6 hours) and
+shows an "Update available" pop-up; Account → App settings & updates has a **Check for updates** button. The APK's
+SHA-256 from the release is verified before Android's installer opens. Debug builds don't auto-check, because a
+release signed with the release key can't be installed over them.
+
+One-time setup: create a release keystore and keep it safe, since every update must be signed with it.
+
+```bash
+keytool -genkeypair -v -keystore suvrnika-release.jks -alias suvrnika -keyalg RSA -keysize 2048 -validity 10000
+base64 -w0 suvrnika-release.jks     # → secret SUVRNIKA_KEYSTORE_BASE64
+```
+
+Then add the secrets `SUVRNIKA_KEYSTORE_BASE64`, `SUVRNIKA_KEYSTORE_PASSWORD`, `SUVRNIKA_KEY_ALIAS` and
+`SUVRNIKA_KEY_PASSWORD` (repository Settings → Secrets and variables → Actions). Optional variables:
+`SUVRNIKA_API_URL` and `SUVRNIKA_ICON_BACKGROUND`.
+
 ## Payments
 
 When Razorpay is configured on the server, checkout, digital-metal purchases and plan instalments
