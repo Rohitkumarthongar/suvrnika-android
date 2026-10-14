@@ -33,6 +33,14 @@ import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.ShoppingBag
+import androidx.compose.material.icons.automirrored.outlined.ShowChart
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import com.suvrnika.app.ui.components.LocalConfig
+import com.suvrnika.app.util.rupeesToPaise
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -95,8 +103,11 @@ fun AccountScreen() {
     val nav = LocalNav.current
     val runner = rememberRunner()
     val signedIn by repo.tokens.signedIn.collectAsState()
-    val links: List<Triple<String, String, ImageVector>> = listOf(
-        Triple("wallet", "Wallet", Icons.Outlined.AccountBalanceWallet),
+    // Trading appears only when the store has switched it on, like the website's account tab.
+    val trading = LocalConfig.current?.trading?.available == true
+    val links: List<Triple<String, String, ImageVector>> = listOfNotNull(
+        Triple("wallet", "Wallet & digital gold", Icons.Outlined.AccountBalanceWallet),
+        if (trading) Triple("trading", "Trading", Icons.AutoMirrored.Outlined.ShowChart) else null,
         Triple("plans", "Savings plans", Icons.Outlined.Savings),
         Triple("orders", "Orders", Icons.Outlined.ShoppingBag),
         Triple("invoices", "Invoices", Icons.AutoMirrored.Outlined.ReceiptLong),
@@ -418,7 +429,34 @@ fun OrdersScreen() {
                     Chip(o.statusLabel, when (o.status) { "CANCELLED" -> Tone.Bad; "PENDING_PAYMENT" -> Tone.Warn; "DELIVERED" -> Tone.Ok; else -> Tone.Neutral })
                 }
                 if (o.stageIndex >= 0) StageBar(o.stages.map { it.label }, o.stageIndex)
+                o.shipment?.let { sh -> Muted(listOfNotNull(sh.courier, "AWB ${sh.awb}", sh.status).joinToString(" · ")) }
             }
+        }
+    }
+}
+
+/** Courier, AWB, latest tracking status and events, with a link to the courier's tracking page. */
+@Composable
+private fun ShipmentPanel(sh: com.suvrnika.app.data.Shipment) {
+    val context = LocalContext.current
+    Panel {
+        Eyebrow("Shipment", Brand.Muted)
+        Text(listOfNotNull(sh.courier, "AWB ${sh.awb}").joinToString(" · "), fontWeight = FontWeight.SemiBold)
+        sh.status?.let { Muted(it + (sh.deliveredAt?.let { d -> " · ${date(d)}" } ?: "")) }
+        sh.events.take(6).forEach { e ->
+            Row(verticalAlignment = Alignment.Top) {
+                Box(Modifier.padding(top = 6.dp).size(6.dp).clip(CircleShape).background(Brand.Gold))
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(e.status + (e.location?.let { " · $it" } ?: ""), fontSize = 13.sp)
+                    Muted(date(e.at))
+                }
+            }
+        }
+        sh.trackingUrl?.takeIf { it.startsWith("https://") || it.startsWith("http://") }?.let { url ->
+            GhostButton("Track shipment ↗", modifier = Modifier.fillMaxWidth(), onClick = {
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            })
         }
     }
 }
@@ -450,14 +488,28 @@ fun OrderScreen(id: String) {
         if (o.stageIndex >= 0) item { StageBar(o.stages.map { it.label }, o.stageIndex) }
         item {
             Panel {
-                o.lines.forEach { KeyValue("${it.name} × ${it.qty}", inr(it.unitPricePaise * it.qty)) }
+                o.lines.forEach { l ->
+                    KeyValue("${l.name} × ${l.qty}", inr(l.unitPricePaise * l.qty))
+                    if (l.discountPaise > 0) KeyValue("   Offer discount", "−" + inr(l.discountPaise), valueColor = Brand.Ok)
+                }
                 Divider()
+                o.offer?.takeIf { it.discountPaise > 0 }?.let { f ->
+                    KeyValue("Special offer" + (f.title?.let { " · $it" } ?: "") + (f.code?.let { " ($it)" } ?: ""), "−" + inr(f.discountPaise), valueColor = Brand.Ok)
+                }
                 KeyValue("Subtotal", inr(o.subtotalPaise))
                 KeyValue("GST", inr(o.gstPaise))
                 if (o.pointsUsed > 0) KeyValue("Points (${count(o.pointsUsed)})", "−" + inr(o.pointsValuePaise), valueColor = Brand.Ok)
                 if (o.schemeUsedPaise > 0) KeyValue("Plan balance", "−" + inr(o.schemeUsedPaise), valueColor = Brand.Ok)
                 KeyValue("Paid", inr(o.payablePaise), bold = true)
                 if (o.pointsEarned > 0 && o.status != "CANCELLED" && o.status != "PENDING_PAYMENT") Muted("+${count(o.pointsEarned)} points earned")
+            }
+        }
+        o.shipment?.let { sh -> item { ShipmentPanel(sh) } }
+        val huids = o.lines.flatMap { l -> l.huids.map { l.name to it } }
+        if (huids.isNotEmpty()) item {
+            Panel {
+                Eyebrow("BIS hallmark · HUID", Brand.Muted)
+                huids.forEach { (name, h) -> KeyValue(name, h) }
             }
         }
         item {
@@ -516,5 +568,120 @@ fun InvoicesScreen() {
                 }
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------- trading
+private val TRADE_STATUS = mapOf("PENDING" to "Pending", "EXECUTED" to "Confirmed", "REJECTED" to "Rejected", "CANCELLED" to "Cancelled")
+
+/**
+ * Same as /account/trading: buy digital gold/silver through the store's broker. The customer pays now; staff
+ * confirm the request at the rate actually dealt and credit the wallet. A pending request can be cancelled
+ * for a refund.
+ */
+@Composable
+fun TradingScreen() {
+    val repo = LocalRepo.current
+    val payments = LocalPayments.current
+    val nav = LocalNav.current
+    val runner = rememberRunner()
+    val key = rememberActionKey()
+    val signedIn by repo.tokens.signedIn.collectAsState()
+    if (!signedIn) return SignInPrompt("Sign in to trade digital gold and silver.")
+    val state = rememberLoad { call { trading() } }
+    var metal by rememberSaveable { mutableStateOf("GOLD") }
+    var amount by rememberSaveable { mutableStateOf("") }
+    var cancelling by remember { mutableStateOf<com.suvrnika.app.data.TradeRequest?>(null) }
+
+    LoadList(state) { t ->
+        item {
+            Column {
+                Heading("Trading")
+                Muted("Buy digital gold/silver through our broker. You pay now; our team confirms your request at the rate actually dealt, and credits your wallet.")
+            }
+        }
+        val win = t.window
+        if (!win.available) {
+            item { Panel { Muted("Trading isn't available right now — the store hasn't connected a trading account yet.") } }
+        } else item {
+            Panel {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Buy at today's rate", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                    Chip(if (win.open) "Open now" else if (win.weekend) "Closed · weekend" else "Closed · opens ${win.start}", if (win.open) Tone.Ok else Tone.Bad)
+                }
+                Muted("Trading hours ${win.start}–${win.end} IST, Monday–Friday.")
+                Options(listOf("GOLD" to "Gold", "SILVER" to "Silver"), metal) { metal = it }
+                val quick = listOf(1000L, 5000L, 10000L)
+                val paise = rupeesToPaise(amount) ?: maxOf(100000L, t.minAmountPaise)
+                Options(quick.map { it.toString() to inr(it * 100) }, (paise / 100).toString()) { amount = it }
+                OutlinedTextField(
+                    value = amount, onValueChange = { v -> amount = v.filter { it.isDigit() || it == '.' }.take(10) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Or enter an amount (${inr(t.minAmountPaise)}–${inr(t.maxAmountPaise)})") }, prefix = { Text("₹") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = Color.White, focusedContainerColor = Color.White, unfocusedBorderColor = Brand.Line),
+                )
+                val rate = if (metal == "GOLD") t.goldPaisePerGram else t.silverPaisePerGram
+                Column(Modifier.fillMaxWidth().background(Brand.GoldPale).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "About ${grams(if (rate > 0) paise * 1000 / rate else 0L)} of ${metal.lowercase()} at our store rate of ${inr(rate)}/g" +
+                            (t.rateUpdatedAt?.let { " (updated ${date(it)})" } ?: "") + ".",
+                        color = Brand.OnGoldPale, fontSize = 14.sp,
+                    )
+                    Text("This is an estimate. The final quantity uses the market rate at which we place your order, so it may be slightly more or less.", color = Brand.OnGoldPale, fontSize = 12.sp)
+                }
+                val inRange = paise in t.minAmountPaise..t.maxAmountPaise
+                if (t.kycLocked) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("KYC required to trade digital metal.", color = Brand.Bad, fontSize = 13.sp)
+                    TextButton(onClick = { nav.navigate("profile") }) { Text("Verify now", color = Brand.Bad) }
+                }
+                if (!inRange) Text("Enter an amount between ${inr(t.minAmountPaise)} and ${inr(t.maxAmountPaise)}.", color = Brand.Bad, fontSize = 13.sp)
+                PrimaryButton(
+                    if (win.open) "Request · ${inr(paise)}" else "Trading closed", gold = true, busy = runner.busy,
+                    enabled = win.open && inRange && !t.kycLocked, modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        runner.run(onDone = state::refresh) {
+                            val start = try {
+                                repo.call { tradeRequest(key.value, com.suvrnika.app.data.TradeRequestBody(metal, "BUY", paise)) }.also { key.settle() }
+                            } catch (e: ApiException) { key.settle(e); throw e }
+                            payments.payWithMessage(start.payment, "Request placed — our team will confirm it at the dealt rate shortly.").second
+                        }
+                    },
+                )
+            }
+        }
+        item { Heading("Your requests") }
+        if (t.requests.isEmpty()) item { Muted("No trade requests yet.") }
+        items(t.requests, key = { it.id }) { r ->
+            Panel {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("${if (r.side == "BUY") "Buy" else "Sell"} ${r.metal.lowercase()} · ${inr(r.amountPaise)}", fontWeight = FontWeight.SemiBold)
+                        Muted(date(r.createdAt) + " · " + if (r.status == "EXECUTED" && r.executedMg != null) "${grams(r.executedMg)} @ ${inr(r.executedRatePaisePerGram ?: 0L)}/g" else "ref. ${inr(r.refRatePaisePerGram)}/g")
+                    }
+                    Chip(TRADE_STATUS[r.status] ?: r.status, when (r.status) { "EXECUTED" -> Tone.Ok; "REJECTED" -> Tone.Bad; "PENDING" -> Tone.Warn; else -> Tone.Neutral })
+                }
+                if (r.status == "EXECUTED" && r.executedMg != null) Text("${grams(r.executedMg)} added to your wallet.", color = Brand.Ok, fontSize = 13.sp)
+                if (r.status == "REJECTED" || r.status == "CANCELLED") Muted(
+                    (if (r.status == "REJECTED" && !r.reason.isNullOrBlank()) "${r.reason}. " else "") +
+                        if (r.refundStatus == "initiated") "Refund started to your original payment method (usually 5–7 working days)." else "Our team will process your refund shortly.",
+                )
+                if (r.status == "PENDING") TextButton(enabled = !runner.busy, onClick = { cancelling = r }) { Text("Cancel request", color = Brand.Bad) }
+            }
+        }
+    }
+
+    cancelling?.let { r ->
+        AlertDialog(
+            onDismissRequest = { cancelling = null },
+            title = { Text("Cancel this request?") },
+            text = { Text("Your payment of ${inr(r.amountPaise)} will be refunded.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    cancelling = null
+                    runner.run(onDone = state::refresh) { repo.call { cancelTrade(r.id) }.message ?: "Request cancelled." }
+                }) { Text("Cancel request", color = Brand.Bad) }
+            },
+            dismissButton = { TextButton(onClick = { cancelling = null }) { Text("Keep it") } },
+        )
     }
 }

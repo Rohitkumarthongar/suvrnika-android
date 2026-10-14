@@ -227,7 +227,7 @@ fun Muted(text: String, modifier: Modifier = Modifier) = Text(text, color = Bran
 @Composable
 fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, busy: Boolean = false, gold: Boolean = false) {
     Button(
-        onClick = onClick, enabled = enabled && !busy, modifier = modifier.height(48.dp), shape = RoundedCornerShape(2.dp),
+        onClick = onClick, enabled = enabled && !busy, modifier = modifier.height(48.dp), shape = Brand.ButtonShape,
         colors = ButtonDefaults.buttonColors(containerColor = if (gold) Brand.Gold else Brand.Ink, contentColor = Color.White),
     ) {
         if (busy) CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
@@ -237,7 +237,7 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
 
 @Composable
 fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier.height(48.dp), shape = RoundedCornerShape(2.dp)) {
+    OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier.height(48.dp), shape = Brand.ButtonShape, border = androidx.compose.foundation.BorderStroke(1.dp, Brand.Line)) {
         Text(text, color = Brand.Ink, fontWeight = FontWeight.SemiBold)
     }
 }
@@ -257,9 +257,9 @@ enum class Tone { Ok, Warn, Bad, Neutral }
 fun Chip(text: String, tone: Tone = Tone.Neutral) {
     val (bg, fg) = when (tone) {
         Tone.Ok -> Brand.OkBg to Brand.Ok
-        Tone.Warn -> Brand.GoldPale to Color(0xFF5E3F0C)
+        Tone.Warn -> Brand.GoldPale to Brand.OnGoldPale
         Tone.Bad -> Brand.BadBg to Brand.Bad
-        Tone.Neutral -> Color(0xFFEEE9E0) to Brand.Body
+        Tone.Neutral -> Brand.Sand to Brand.Body
     }
     Text(text.uppercase(), Modifier.background(bg).padding(horizontal = 8.dp, vertical = 4.dp), color = fg, style = MaterialTheme.typography.labelSmall)
 }
@@ -275,7 +275,7 @@ fun KeyValue(key: String, value: String, bold: Boolean = false, valueColor: Colo
 @Composable
 fun Divider() = HorizontalDivider(color = Brand.Line)
 
-private fun metalBg(metal: String) = when (metal) { "SILVER" -> Color(0xFFE3E8EE); "DIAMOND" -> Color(0xFFF0E3C8); else -> Brand.GoldPale }
+private fun metalBg(metal: String) = when (metal) { "SILVER" -> Color(0xFFE3E8EE); "DIAMOND" -> Brand.Sand; else -> Brand.GoldPale }
 
 /** Product photo, or the storefront's metal-tinted placeholder when there is none. */
 @Composable
@@ -290,9 +290,8 @@ fun ItemImage(imageUrl: String?, metal: String, modifier: Modifier = Modifier) {
 
 @Composable
 fun ProductCard(item: Item, onOpen: () -> Unit, onWish: (() -> Unit)?, modifier: Modifier = Modifier) {
-    Column(
-        modifier.clip(RoundedCornerShape(14.dp)).background(Color.White).border(1.dp, Brand.Line, RoundedCornerShape(14.dp)).clickable(onClick = onOpen),
-    ) {
+    val shape = RoundedCornerShape(Brand.CardRadius)
+    Column(modifier.clip(shape).background(Color.White).border(1.dp, Brand.Line, shape).clickable(onClick = onOpen)) {
         Box {
             ItemImage(item.imageUrl, item.metal, Modifier.fillMaxWidth().aspectRatio(0.9f))
             Text(

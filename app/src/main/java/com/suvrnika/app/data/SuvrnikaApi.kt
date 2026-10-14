@@ -31,6 +31,8 @@ interface SuvrnikaApi {
     @GET("api/v1/catalogue") suspend fun catalogue(
         @Query("metal") metal: String? = null, @Query("cat") category: String? = null, @Query("tag") tag: String? = null,
         @Query("band") band: String? = null, @Query("q") query: String? = null, @Query("sort") sort: String? = null,
+        /** MEN or WOMEN for that storefront view (its items plus unisex ones); null for every item. */
+        @Query("gender") gender: String? = null,
     ): CatalogueResponse
     @GET("api/v1/products/{sku}") suspend fun product(@Path("sku") sku: String): ProductResponse
     @GET("api/v1/branches") suspend fun branches(): BranchesResponse
@@ -40,7 +42,10 @@ interface SuvrnikaApi {
     @GET("api/v1/journal/{slug}") suspend fun post(@Path("slug") slug: String): PostResponse
 
     // ---- bag & wishlist (signed in, or guest via X-Guest-Token)
-    @GET("api/v1/bag") suspend fun bag(@Query("usePoints") usePoints: Boolean = false, @Query("useScheme") useScheme: Boolean = false): Bag
+    @GET("api/v1/bag") suspend fun bag(
+        @Query("usePoints") usePoints: Boolean = false, @Query("useScheme") useScheme: Boolean = false,
+        @Query("offerId") offerId: String? = null, @Query("offerCode") offerCode: String? = null,
+    ): Bag
     @POST("api/v1/bag/items") suspend fun addToBag(@Body body: AddToBagRequest): ActionResult
     @PATCH("api/v1/bag/items/{lineId}") suspend fun setQty(@Path("lineId") lineId: String, @Body body: QtyRequest): ActionResult
     @DELETE("api/v1/bag/items/{lineId}") suspend fun removeLine(@Path("lineId") lineId: String): ActionResult
@@ -71,6 +76,10 @@ interface SuvrnikaApi {
     @POST("api/v1/wallet/buy-metal") suspend fun buyMetal(@Header("Idempotency-Key") key: String, @Body body: BuyMetalRequest): PaymentStartResponse
     @POST("api/v1/wallet/convert-points") suspend fun convertPoints(@Header("Idempotency-Key") key: String, @Body body: PointsRequest): ActionResult
     @POST("api/v1/wallet/sell-gold") suspend fun sellGold(@Header("Idempotency-Key") key: String, @Body body: SellGoldRequest): ActionResult
+
+    @GET("api/v1/trading") suspend fun trading(): Trading
+    @POST("api/v1/trading") suspend fun tradeRequest(@Header("Idempotency-Key") key: String, @Body body: TradeRequestBody): PaymentStartResponse
+    @POST("api/v1/trading/{id}/cancel") suspend fun cancelTrade(@Path("id") id: String): ActionResult
 
     @GET("api/v1/plans") suspend fun plans(): Plans
     @POST("api/v1/plans/join") suspend fun joinPlan(@Header("Idempotency-Key") key: String, @Body body: JoinPlanRequest): PaymentStartResponse

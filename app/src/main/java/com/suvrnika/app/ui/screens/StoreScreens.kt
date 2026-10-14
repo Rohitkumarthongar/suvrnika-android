@@ -37,6 +37,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.Diamond
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Star
@@ -53,6 +54,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
@@ -117,6 +119,9 @@ import com.suvrnika.app.ui.components.payWithMessage
 import com.suvrnika.app.ui.components.rememberLoad
 import com.suvrnika.app.ui.components.rememberRunner
 import com.suvrnika.app.ui.theme.Brand
+import com.suvrnika.app.ui.theme.StoreView
+import com.suvrnika.app.ui.components.GenderEditCards
+import com.suvrnika.app.data.Rates
 import com.suvrnika.app.util.count
 import com.suvrnika.app.util.grams
 import com.suvrnika.app.util.inr
@@ -147,7 +152,18 @@ fun rememberActionKey(): ActionKey {
 }
 
 // ---------------------------------------------------------------- home
-private class HomeData(val catalogue: CatalogueResponse, val offers: List<Offer>, val posts: List<Post>)
+private class HomeData(val catalogue: CatalogueResponse, val offers: List<Offer>, val posts: List<Post>, val rates: Rates?)
+
+/** Home hero copy for the Men / Women views (the website's GENDER_HERO). */
+private val GENDER_HERO = mapOf(
+    "MEN" to listOf("For him · The men's edit", "Bold by design,", "made to be worn.", "Signet rings, kadas, chains and studs in hallmarked gold, diamond and silver, priced at today's rate.", "Shop men's jewellery"),
+    "WOMEN" to listOf("For her · The women's edit", "Grace in", "every detail.", "Necklaces, jhumkas, bangles and solitaires for every occasion, priced at today's rate.", "Shop women's jewellery"),
+)
+
+/** Metals the store sells (Admin → Company setup), in the storefront's order. */
+@Composable
+fun offeredMetals(): List<String> = LocalConfig.current?.company?.metals?.let { m -> listOf("GOLD", "DIAMOND", "SILVER").filter { it in m } }?.ifEmpty { null }
+    ?: listOf("GOLD", "DIAMOND", "SILVER")
 
 @Composable
 fun HomeScreen() {
@@ -155,13 +171,16 @@ fun HomeScreen() {
     val repo = LocalRepo.current
     val cfg = LocalConfig.current
     val runner = rememberRunner()
-    val state = rememberLoad {
+    val gender = StoreView.gender
+    val metals = offeredMetals()
+    val state = rememberLoad(gender) {
         coroutineScope {
-            val cat = async { call { catalogue() } }
-            // Offers and articles are extras: the home page still loads if either is unavailable.
+            val cat = async { call { catalogue(gender = gender) } }
+            // Offers, articles and the price strip are extras: the home page still loads if any is unavailable.
             val offers = async { runCatching { call { offers() }.offers }.getOrDefault(emptyList()) }
             val posts = async { runCatching { call { journal() }.posts }.getOrDefault(emptyList()) }
-            HomeData(cat.await(), offers.await(), posts.await())
+            val rates = async { runCatching { call { rates() } }.getOrNull() }
+            HomeData(cat.await(), offers.await(), posts.await(), rates.await())
         }
     }
     val open = { i: Item -> nav.navigate("product/${i.sku}") }
@@ -179,8 +198,15 @@ fun HomeScreen() {
         }
         item {
             val newest = pieces.lastOrNull()
+            // In the Men / Women view, lead with that view's own copy and a piece made for it rather than a unisex one.
+            val g = gender?.let { GENDER_HERO[it] }
+            val featured = gender?.let { v -> pieces.firstOrNull { it.gender == v } } ?: pieces.firstOrNull()
             val slides = buildList {
-                add(Slide(
+                if (g != null) add(Slide(
+                    eyebrow = g[0], title = g[1], emphasis = g[2], body = g[3], cta = g[4], imageUrl = featured?.imageUrl,
+                    style = SlideStyle.Emerald, onClick = { nav.navigate("shop") },
+                ))
+                else add(Slide(
                     eyebrow = "The festive edit · ${java.time.Year.now().value}", title = company?.hero1?.ifBlank { null } ?: "Heirlooms,",
                     emphasis = company?.hero2?.ifBlank { null } ?: "made for every day.",
                     body = "Hallmarked gold, certified diamonds and sterling silver — priced openly at today's rate.",
@@ -201,7 +227,9 @@ fun HomeScreen() {
             }
             HeroCarousel(slides)
         }
-        cfg?.rates?.takeIf { it.goldPaisePerGram > 0 }?.let { r ->
+        (home.rates ?: cfg?.rates)?.takeIf { it.goldPaisePerGram > 0 }?.let { r ->
+            // The prices the owner chose for the website's top strip; the two base rates if none are set.
+            val ticker = r.ticker.ifEmpty { listOf(com.suvrnika.app.data.TickerPrice("g", "Gold 24K", r.goldPaisePerGram), com.suvrnika.app.data.TickerPrice("s", "Silver 999", r.silverPaisePerGram)) }
             item {
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White).border(1.dp, Brand.Line, RoundedCornerShape(16.dp))
@@ -210,8 +238,9 @@ fun HomeScreen() {
                 ) {
                     Column(Modifier.weight(1f)) { Eyebrow("Today's rate"); Muted("Tap for the metal calculator") }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text("Gold 24K  ${inr(r.goldPaisePerGram)}/g", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text("Silver 999  ${inr(r.silverPaisePerGram)}/g", color = Brand.Body, fontSize = 13.sp)
+                        ticker.take(4).forEachIndexed { n, t ->
+                            Text("${t.label}  ${inr(t.paisePerGram)}/g", fontWeight = if (n == 0) FontWeight.Bold else FontWeight.Normal, color = if (n == 0) Brand.Ink else Brand.Body, fontSize = if (n == 0) 14.sp else 13.sp)
+                        }
                     }
                 }
             }
@@ -236,7 +265,7 @@ fun HomeScreen() {
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf(Triple("GOLD", Brand.GoldPale, "Hallmarked"), Triple("DIAMOND", Color(0xFFF0E3C8), "Certified"), Triple("SILVER", Color(0xFFE3E8EE), "Sterling")).forEach { (m, bg, sub) ->
+                listOf(Triple("GOLD", Brand.GoldPale, "Hallmarked"), Triple("DIAMOND", Brand.Sand, "Certified"), Triple("SILVER", Color(0xFFE3E8EE), "Sterling")).filter { it.first in metals }.forEach { (m, bg, sub) ->
                     Column(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(bg).clickable { nav.navigate("shop?metal=$m") }.padding(12.dp)) {
                         Icon(Icons.Outlined.Diamond, null, tint = Brand.Gold, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.height(6.dp))
@@ -248,14 +277,17 @@ fun HomeScreen() {
         }
         if (pieces.isNotEmpty()) item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionHeader("Bestsellers", "Loved this season", "View all") { nav.navigate("shop") }
+                SectionHeader(gender?.let { "${StoreView.LABEL[it]}'s bestsellers" } ?: "Bestsellers", "Loved this season", "View all") { nav.navigate("shop") }
                 ItemRail(pieces.take(8), open, wish)
             }
+        }
+        item {
+            GenderEditCards(cfg?.homeImages?.her?.firstOrNull(), cfg?.homeImages?.him?.firstOrNull()) { nav.navigate("shop") { launchSingleTop = true } }
         }
         cfg?.popup?.takeIf { it.headline.isNotBlank() }?.let { p ->
             item {
                 Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Brush.linearGradient(listOf(Color(0xFF2C5A4D), Brand.Emerald))).padding(22.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Brush.linearGradient(listOf(Brand.EmeraldHi, Brand.Emerald))).padding(22.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Eyebrow("Savings plans", Brand.GoldLight)
@@ -328,8 +360,10 @@ fun ShopScreen(metal0: String?, cat0: String?, tag0: String?, band0: String?, q0
     var query by rememberSaveable { mutableStateOf(q0.orEmpty()) }
     var applied by rememberSaveable { mutableStateOf(q0.orEmpty()) }
     var sheet by rememberSaveable { mutableStateOf(false) }
-    val state = rememberLoad(metal, cat, band, sort, applied, tag) {
-        call { catalogue(metal, cat, tag, band, applied.ifBlank { null }, sort) }
+    val gender = StoreView.gender
+    val metals = offeredMetals()
+    val state = rememberLoad(metal, cat, band, sort, applied, tag, gender) {
+        call { catalogue(metal, cat, tag, band, applied.ifBlank { null }, sort, gender) }
     }
     val categories = cfg?.categories.orEmpty()
     val bands = state.data?.bands.orEmpty()
@@ -353,10 +387,13 @@ fun ShopScreen(metal0: String?, cat0: String?, tag0: String?, band0: String?, q0
                 }
             }
         }
-        full("metals") { ChipRow(METALS, metal) { metal = it } }
+        full("metals") { ChipRow(METALS.filter { it.first == null || it.first in metals }, metal) { metal = it } }
         full("title") {
-            val title = tag?.let { "$it jewellery" } ?: applied.takeIf { it.isNotBlank() }?.let { "Results for “$it”" }
-                ?: categories.find { it.id == cat }?.name ?: metal?.let { "${metalLabel(it)} jewellery" } ?: "All jewellery"
+            val plain = tag?.let { "$it jewellery" } ?: categories.find { it.id == cat }?.name ?: metal?.let { "${metalLabel(it)} jewellery" } ?: "All jewellery"
+            // The Men / Women view names the page the way the website does: "Women's jewellery", "Men's rings".
+            val title = applied.takeIf { it.isNotBlank() }?.let { "Results for “$it”" }
+                ?: gender?.let { g -> StoreView.LABEL[g] + "'s " + if (plain == "All jewellery") "jewellery" else plain.replaceFirstChar { it.lowercase() } }
+                ?: plain
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(title, style = MaterialTheme.typography.headlineMedium)
                 Muted("${res.items.size} pieces · priced at today's rate")
@@ -372,6 +409,7 @@ fun ShopScreen(metal0: String?, cat0: String?, tag0: String?, band0: String?, q0
             Column(Modifier.fillMaxWidth().padding(vertical = 40.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Nothing matches these filters yet", style = MaterialTheme.typography.headlineSmall)
                 GhostButton("Clear filters", onClick = { cat = null; band = null; sort = null; tag = null; metal = null; query = ""; applied = "" })
+                if (gender != null) TextButton(onClick = { StoreView.set(null) }) { Text("Show all jewellery", color = Brand.Gold) }
             }
         }
         items(res.items, key = { it.id }) { i -> ProductCard(i, onOpen = { nav.navigate("product/${i.sku}") }, onWish = { runner.toggleWish(repo, i, state::refresh) }) }
@@ -438,13 +476,15 @@ fun ProductScreen(sku: String) {
     val repo = LocalRepo.current
     val bagChanged = LocalBagChanged.current
     val runner = rememberRunner()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val whatsapp = LocalConfig.current?.company?.whatsapp.orEmpty()
     val state = rememberLoad(sku) { call { product(sku) } }
     LoadList(state) { p ->
         val i = p.item
         item { ItemImage(i.imageUrl, i.metal, Modifier.fillMaxWidth().aspectRatio(1f)) }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Eyebrow("${metalLabel(i.metal)} · ${i.purityLabel}")
+                Eyebrow("${metalLabel(i.metal)} · ${i.purityLabel}" + if (i.gender != "UNISEX") " · for ${StoreView.LABEL[i.gender]?.lowercase()}" else "")
                 Text(i.name, style = MaterialTheme.typography.displaySmall)
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(inr(i.price.totalPaise), fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
@@ -473,7 +513,7 @@ fun ProductScreen(sku: String) {
             Row(Modifier.fillMaxWidth().background(Brand.GoldPale).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Star, null, tint = Brand.Gold)
                 Spacer(Modifier.width(10.dp))
-                Text("Earn ${count(p.pointsEarned)} points (worth ${inr(p.pointsEarnedValuePaise)}). Plan balance can be used at checkout.", color = Color(0xFF4A3309), fontSize = 14.sp)
+                Text("Earn ${count(p.pointsEarned)} points (worth ${inr(p.pointsEarnedValuePaise)}). Plan balance can be used at checkout.", color = Brand.OnGoldPale, fontSize = 14.sp)
             }
         }
         item {
@@ -494,6 +534,9 @@ fun ProductScreen(sku: String) {
                 Muted("Insured delivery · Certified hallmark + HUID")
             }
         }
+        if (whatsapp.any(Char::isDigit)) item {
+            GhostButton("Ask on WhatsApp", modifier = Modifier.fillMaxWidth(), onClick = { askOnWhatsApp(context, whatsapp, i.name, i.sku) })
+        }
         if (p.related.isNotEmpty()) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -503,6 +546,19 @@ fun ProductScreen(sku: String) {
             }
         }
     }
+}
+
+/**
+ * Opens a WhatsApp chat with the store (Admin → Company setup) about this piece, with the item pre-filled —
+ * the website's "Ask on WhatsApp" button. A 10-digit number is an Indian mobile, so +91 is added.
+ */
+private fun askOnWhatsApp(context: android.content.Context, whatsapp: String, itemName: String, sku: String) {
+    val digits = whatsapp.filter(Char::isDigit)
+    val to = if (digits.length == 10) "91$digits" else digits
+    val url = com.suvrnika.app.BuildConfig.API_BASE_URL.trimEnd('/') + "/product/" + android.net.Uri.encode(sku)
+    val text = "Hi! I'd like to ask about $itemName — $url"
+    val uri = android.net.Uri.parse("https://wa.me/$to?text=" + android.net.Uri.encode(text))
+    runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
 }
 
 // ---------------------------------------------------------------- bag & checkout
@@ -517,8 +573,20 @@ fun BagScreen() {
     var usePoints by rememberSaveable { mutableStateOf(false) }
     var useScheme by rememberSaveable { mutableStateOf(false) }
     var method by rememberSaveable { mutableStateOf<String?>(null) }
-    val state = rememberLoad(usePoints, useScheme) { call { bag(usePoints, useScheme) } }
+    // The special offer to redeem, and a typed offer code waiting for the server to check it.
+    var offerId by rememberSaveable { mutableStateOf<String?>(null) }
+    var code by rememberSaveable { mutableStateOf("") }
+    var codeTry by remember { mutableStateOf<String?>(null) }
+    val toast = com.suvrnika.app.ui.components.LocalToast.current
+    val state = rememberLoad(usePoints, useScheme, offerId, codeTry) { call { bag(usePoints, useScheme, offerId, codeTry) } }
     val reload = { state.refresh(); bagChanged() }
+    // Keep whichever offer the server accepted (a typed code resolves to its offer); drop one it rejected.
+    androidx.compose.runtime.LaunchedEffect(state.data) {
+        val b = state.data ?: return@LaunchedEffect
+        b.offerError?.let(toast)
+        if (codeTry != null && b.offer != null) { toast("${b.offer.title} applied."); code = "" }
+        if (b.offer?.id != offerId || codeTry != null) { offerId = b.offer?.id; codeTry = null }
+    }
 
     LoadList(state) { bag ->
         item { Heading("Your bag") }
@@ -545,14 +613,26 @@ fun BagScreen() {
                         Spacer(Modifier.weight(1f))
                         TextButton(onClick = { runner.run(onDone = reload) { repo.call { removeLine(l.lineId) }; "Removed from your bag." } }) { Text("Remove", color = Brand.Muted) }
                     }
-                    Text(inr(l.lineBasePaise), fontWeight = FontWeight.SemiBold)
+                    val off = bag.offer?.lines?.get(l.lineId) ?: 0L
+                    if (off > 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(inr(l.lineBasePaise), color = Brand.Muted, textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough, fontSize = 13.sp)
+                        Text(inr(l.lineBasePaise - off), fontWeight = FontWeight.SemiBold, color = Brand.Ok)
+                    } else Text(inr(l.lineBasePaise), fontWeight = FontWeight.SemiBold)
                 }
             }
+        }
+        item {
+            OfferBox(bag, code, onCode = { code = it.uppercase().take(20) }, busy = state.refreshing,
+                onRedeem = { offerId = it }, onApplyCode = { if (code.isNotBlank()) codeTry = code.trim() })
         }
         item {
             Panel {
                 val t = bag.totals
                 Text("Order summary", style = MaterialTheme.typography.titleLarge)
+                if (t.offerDiscountPaise > 0) {
+                    KeyValue("Items", inr(t.itemsTotalPaise))
+                    KeyValue("Special offer" + (bag.offer?.title?.let { " · $it" } ?: ""), "−" + inr(t.offerDiscountPaise), valueColor = Brand.Ok)
+                }
                 KeyValue("Subtotal", inr(t.subtotalPaise))
                 KeyValue("GST ${t.gstBasisPoints / 100.0}%", inr(t.gstPaise))
                 if (bag.signedIn) {
@@ -572,6 +652,11 @@ fun BagScreen() {
                 }
                 Divider()
                 KeyValue("To pay", inr(t.payablePaise), bold = true)
+                // GST is charged on the reduced value, so the offer saves that GST too.
+                if (t.offerDiscountPaise > 0) Text(
+                    "You save ${inr(t.offerDiscountPaise + t.offerDiscountPaise * t.gstBasisPoints / 10_000)} with this offer (incl. GST).",
+                    Modifier.fillMaxWidth().background(Brand.OkBg).padding(10.dp), color = Brand.Ok, fontSize = 13.sp,
+                )
                 Muted("You earn ${count(t.pointsEarned)} points on this order.")
             }
         }
@@ -597,7 +682,7 @@ fun BagScreen() {
                     val chosen = method ?: bag.methods.firstOrNull()?.key ?: "UPI"
                     runner.run(onDone = reload) {
                         val res = try {
-                            repo.call { checkout(key.value, com.suvrnika.app.data.CheckoutRequest(usePoints, useScheme, chosen)) }.also { key.settle() }
+                            repo.call { checkout(key.value, com.suvrnika.app.data.CheckoutRequest(usePoints, useScheme, chosen, offerId)) }.also { key.settle() }
                         } catch (e: ApiException) { key.settle(e); throw e }
                         val (paid, msg) = payments.payWithMessage(res.payment, "Order ${res.orderNumber} placed. Thank you!")
                         if (paid) nav.navigate("order/${res.orderId}")
@@ -606,6 +691,59 @@ fun BagScreen() {
                 })
                 if (bag.panBlocked) GhostButton("Complete KYC", onClick = { nav.navigate("profile") }, modifier = Modifier.fillMaxWidth())
             }
+        }
+    }
+}
+
+/** "Special offers": the applied offer, offers this bag can redeem with what each saves, and an offer-code box. */
+@Composable
+private fun OfferBox(bag: com.suvrnika.app.data.Bag, code: String, onCode: (String) -> Unit, busy: Boolean, onRedeem: (String?) -> Unit, onApplyCode: () -> Unit) {
+    val applied = bag.offer
+    val others = bag.offers.filter { it.id != applied?.id }
+    val usable = others.filter { it.available }
+    val blocked = others.filter { !it.available }
+    if (!bag.signedIn && bag.offers.isEmpty()) return
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.LocalOffer, null, tint = Brand.Gold, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Eyebrow("Special offers", Brand.Ink)
+        }
+        applied?.let { o ->
+            Row(Modifier.fillMaxWidth().background(Brand.OkBg).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("✓ ${o.title}", color = Brand.Ok, fontWeight = FontWeight.SemiBold)
+                    Text(o.label + (o.code?.let { " · code $it" } ?: ""), color = Brand.Ok, fontSize = 12.sp)
+                    val names = bag.lines.filter { o.lines.containsKey(it.lineId) }.joinToString { it.item.name }
+                    if (names.isNotBlank()) Text("On $names", color = Brand.Ok, fontSize = 12.sp)
+                }
+                TextButton(enabled = !busy, onClick = { onRedeem(null) }) { Text("Remove", color = Brand.Ok) }
+            }
+        }
+        usable.forEach { o ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(o.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Muted(o.label + " · save ${inr(o.discountPaise)}" + (endsIn(o.endsAt)?.let { " · $it" } ?: ""))
+                }
+                OutlinedButton(enabled = !busy, onClick = { onRedeem(o.id) }, shape = Brand.ButtonShape) { Text(if (applied != null) "Use this" else "Redeem", color = Brand.Ink) }
+            }
+        }
+        blocked.forEach { o ->
+            Column {
+                Text(o.title, color = Brand.Muted, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                o.reason?.let { Muted(it) }
+            }
+        }
+        if (applied == null && usable.isEmpty() && blocked.isEmpty()) Muted("No offers for the items in your bag right now.")
+        if (bag.signedIn) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = code, onValueChange = onCode, modifier = Modifier.weight(1f), singleLine = true, placeholder = { Text("Offer code") },
+                keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onApplyCode() }),
+                colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = Color.White, focusedContainerColor = Color.White, unfocusedBorderColor = Brand.Line),
+            )
+            GhostButton("Apply", enabled = code.isNotBlank() && !busy, onClick = onApplyCode)
         }
     }
 }

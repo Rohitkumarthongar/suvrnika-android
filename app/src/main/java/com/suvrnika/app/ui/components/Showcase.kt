@@ -162,9 +162,9 @@ data class Slide(
 enum class SlideStyle { Emerald, Gold, Sand, Ink }
 
 private fun slideColors(s: SlideStyle): Triple<Brush, Color, Color> = when (s) {
-    SlideStyle.Emerald -> Triple(Brush.linearGradient(listOf(Color(0xFF2C5A4D), Brand.Emerald, Color(0xFF0F241F))), Brand.Cream, Brand.GoldLight)
-    SlideStyle.Gold -> Triple(Brush.linearGradient(listOf(Color(0xFFB88A3E), Brand.Gold, Brand.GoldDark)), Color.White, Brand.GoldSoft)
-    SlideStyle.Sand -> Triple(Brush.linearGradient(listOf(Brand.GoldPale, Color(0xFFF0E3C8), Brand.Sand)), Brand.Ink, Brand.Gold)
+    SlideStyle.Emerald -> Triple(Brush.linearGradient(listOf(Brand.EmeraldHi, Brand.Emerald, Brand.EmeraldLo)), Brand.Cream, Brand.GoldLight)
+    SlideStyle.Gold -> Triple(Brush.linearGradient(listOf(Brand.GoldHi, Brand.Gold, Brand.GoldDark)), Color.White, Brand.GoldSoft)
+    SlideStyle.Sand -> Triple(Brush.linearGradient(listOf(Brand.GoldPale, Brand.Sand, Brand.Sand)), Brand.Ink, Brand.Gold)
     SlideStyle.Ink -> Triple(Brush.linearGradient(listOf(Color(0xFF34302A), Brand.Ink)), Brand.Cream, Brand.GoldLight)
 }
 
@@ -219,9 +219,9 @@ fun HeroCarousel(slides: List<Slide>, modifier: Modifier = Modifier) {
 private fun Modifier.shift(x: Dp, y: Dp = 0.dp) = graphicsLayer { translationX = x.toPx(); translationY = y.toPx() }
 
 // ---------------------------------------------------------------- journal
-private val COVERS = listOf(
-    listOf(Color(0xFF2C5A4D), Brand.Emerald),
-    listOf(Color(0xFFB88A3E), Brand.GoldDark),
+private val COVERS get() = listOf(
+    listOf(Brand.EmeraldHi, Brand.Emerald),
+    listOf(Brand.GoldHi, Brand.GoldDark),
     listOf(Color(0xFF6B4E3D), Color(0xFF34302A)),
     listOf(Color(0xFF5C6F7E), Color(0xFF2E3B45)),
 )
@@ -266,7 +266,7 @@ fun endsIn(iso: String): String? = runCatching {
 @Composable
 fun OfferCard(offer: Offer, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier.clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(listOf(Brand.GoldPale, Color(0xFFF7EDD8)))).border(1.dp, Brand.GoldSoft, RoundedCornerShape(16.dp))
+        modifier.clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(listOf(Brand.GoldPale, Brand.Ivory))).border(1.dp, Brand.GoldSoft, RoundedCornerShape(16.dp))
             .clickable(onClick = onOpen).padding(16.dp).animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -277,6 +277,7 @@ fun OfferCard(offer: Offer, onOpen: () -> Unit, modifier: Modifier = Modifier) {
         }
         Text(offer.title, style = MaterialTheme.typography.headlineSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(offer.summary, color = Brand.Body, fontSize = 13.sp, lineHeight = 18.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        offer.redeem?.let { Text("✓ Online at checkout · ${it.label}", color = Brand.Ok, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         Text((offer.ctaLabel.ifBlank { "Details & terms" }) + " →", color = Brand.GoldDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
     }
 }
@@ -303,7 +304,11 @@ fun openStoreLink(nav: NavHostController, context: android.content.Context, link
     fun q(k: String) = uri.getQueryParameter(k)
     val route = when {
         p == "" || p == "/" -> "home"
-        p == "/shop" -> "shop?" + listOf("metal", "cat", "tag", "band", "q").mapNotNull { k -> q(k)?.let { "$k=${Uri.encode(it)}" } }.joinToString("&")
+        p == "/shop" -> {
+            // Older links pick a storefront view with ?gender=men|women; the view itself is a remembered setting.
+            q("gender")?.uppercase()?.takeIf { it in com.suvrnika.app.ui.theme.StoreView.GENDERS }?.let(com.suvrnika.app.ui.theme.StoreView::set)
+            "shop?" + listOf("metal", "cat", "tag", "band", "q").mapNotNull { k -> q(k)?.let { "$k=${Uri.encode(it)}" } }.joinToString("&")
+        }
         p.startsWith("/product/") -> "product/" + p.removePrefix("/product/")
         p == "/bag" -> "bag"
         p == "/wishlist" -> "wishlist"
@@ -315,7 +320,7 @@ fun openStoreLink(nav: NavHostController, context: android.content.Context, link
         p.startsWith("/journal/") -> "post/" + p.removePrefix("/journal/")
         p.startsWith("/help") -> "help"
         p == "/account" || p == "/account/wallet" -> "wallet"
-        p.startsWith("/account/") -> mapOf("plans" to "plans", "orders" to "orders", "invoices" to "invoices", "history" to "history", "payments" to "payments", "profile" to "profile")[p.removePrefix("/account/")]
+        p.startsWith("/account/") -> mapOf("trading" to "trading", "plans" to "plans", "orders" to "orders", "invoices" to "invoices", "history" to "history", "payments" to "payments", "profile" to "profile")[p.removePrefix("/account/")]
         p == "/login" -> "login"
         else -> null
     }
@@ -355,7 +360,7 @@ fun OfferPopupHost(currentRoute: String, blocked: Boolean) {
         Column(
             Modifier.padding(24.dp).widthIn(max = 420.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Brand.Ivory),
         ) {
-            Box(Modifier.fillMaxWidth().height(170.dp).background(Brush.linearGradient(listOf(Color(0xFF2C5A4D), Brand.Emerald, Color(0xFF0F241F))))) {
+            Box(Modifier.fillMaxWidth().height(170.dp).background(Brush.linearGradient(listOf(Brand.EmeraldHi, Brand.Emerald, Brand.EmeraldLo)))) {
                 repo.imageUrl(popup.imageUrl.ifBlank { null })?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
                 Box(Modifier.align(Alignment.Center).size(120.dp).border(1.dp, Brand.GoldLight.copy(alpha = 0.4f), CircleShape))
                 Box(Modifier.align(Alignment.Center).size(84.dp).border(1.dp, Brand.GoldLight.copy(alpha = 0.6f), CircleShape), Alignment.Center) {

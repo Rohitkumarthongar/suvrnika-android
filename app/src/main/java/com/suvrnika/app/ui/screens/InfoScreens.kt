@@ -8,6 +8,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -223,13 +225,28 @@ fun OfferScreen(slug: String) {
     LoadList(state) { o ->
         item {
             Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Brush.linearGradient(listOf(Color(0xFFB88A3E), Brand.Gold, Brand.GoldDark))).padding(22.dp),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Brush.linearGradient(listOf(Brand.GoldHi, Brand.Gold, Brand.GoldDark))).padding(22.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Eyebrow(endsIn(o.endsAt) ?: "Offer", Brand.GoldSoft)
                 Text(o.title, style = MaterialTheme.typography.displaySmall, color = Color.White)
                 if (o.summary.isNotBlank()) Text(o.summary, color = Color.White.copy(alpha = 0.9f), fontSize = 15.sp, lineHeight = 21.sp)
                 Text("${date(o.startsAt)} – ${date(o.endsAt)} · For ${AUDIENCE[o.audience] ?: "everyone"}", color = Brand.GoldSoft, fontSize = 12.sp)
+            }
+        }
+        o.redeem?.let { r ->
+            item {
+                Row(Modifier.fillMaxWidth().background(Brand.OkBg).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("✓", color = Brand.Ok, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Spacer(Modifier.width(10.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Redeem online at checkout · ${r.label}", color = Brand.Ok, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text(
+                            if (r.needsCode) "Enter the offer code from our campaign in your bag." else "Add eligible pieces to your bag and choose this offer under Special offers.",
+                            color = Brand.Ok, fontSize = 12.sp,
+                        )
+                    }
+                }
             }
         }
         item { Paragraphs(o.body) }

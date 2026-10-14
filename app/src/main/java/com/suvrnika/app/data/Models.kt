@@ -25,11 +25,15 @@ import kotlinx.serialization.Serializable
 @Serializable data class AuthResult(val status: String, val signupToken: String? = null, val tokens: Tokens? = null, val customer: Profile? = null)
 
 // ---------------------------------------------------------------- config & content
-@Serializable data class Rates(val goldPaisePerGram: Long = 0, val silverPaisePerGram: Long = 0, val gstBasisPoints: Int = 300)
+/** One price in the strip at the top of the website (Admin → Integrations → Prices on the website), e.g. "Gold 22K". */
+@Serializable data class TickerPrice(val id: String, val label: String, val paisePerGram: Long)
+@Serializable data class Rates(val goldPaisePerGram: Long = 0, val silverPaisePerGram: Long = 0, val gstBasisPoints: Int = 300, val ticker: List<TickerPrice> = emptyList())
 @Serializable data class Company(
     val name: String = "SUVRNIKA", val tag: String = "", val legal: String = "", val logoUrl: String = "", val address: String = "",
     val phone: String = "", val whatsapp: String = "", val email: String = "", val hours: String = "", val gstin: String = "", val bis: String = "",
     val announce: String = "", val hero1: String = "", val hero2: String = "", val heroImg: String = "",
+    /** Metals the store sells (Admin → Company setup → Metals & purities); pieces in other metals are hidden. */
+    val metals: List<String> = listOf("GOLD", "DIAMOND", "SILVER"),
 )
 @Serializable data class Faq(val question: String, val answer: String)
 @Serializable data class SocialUrls(val instagram: String = "", val facebook: String = "", val youtube: String = "", val whatsapp: String = "")
@@ -49,12 +53,20 @@ import kotlinx.serialization.Serializable
 @Serializable data class AppConfig(
     val apiVersion: Int = 1, val company: Company = Company(), val support: Support = Support(), val points: PointsConfig = PointsConfig(),
     val rules: Rules = Rules(), val popup: Popup = Popup(), val payments: PaymentsConfig = PaymentsConfig(), val rates: Rates = Rates(),
-    val categories: List<Category> = emptyList(),
+    val categories: List<Category> = emptyList(), val trading: TradingFlag = TradingFlag(), val homeImages: HomeImages = HomeImages(),
 )
+@Serializable data class HomeImages(val her: List<String> = emptyList(), val him: List<String> = emptyList())
+@Serializable data class TradingFlag(val available: Boolean = false)
 
 @Serializable data class Offer(
     val id: String, val title: String, val slug: String, val summary: String = "", val body: String = "", val terms: String = "",
     val startsAt: String = "", val endsAt: String = "", val audience: String = "ALL", val ctaLabel: String = "", val ctaUrl: String = "",
+    val redeem: OfferRedeem? = null,
+)
+/** How an offer can be redeemed online at checkout. A code-only offer never reveals its code here. */
+@Serializable data class OfferRedeem(
+    val label: String = "", val kind: String = "", val value: Double = 0.0, val needsCode: Boolean = false,
+    val minOrderPaise: Long = 0, val maxDiscountPaise: Long? = null,
 )
 @Serializable data class OffersResponse(val offers: List<Offer> = emptyList())
 @Serializable data class OfferResponse(val offer: Offer)
@@ -66,7 +78,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class Price(val metalPaise: Long = 0, val makingPaise: Long = 0, val stonePaise: Long = 0, val basePaise: Long = 0, val gstPaise: Long = 0, val totalPaise: Long = 0)
 @Serializable data class Item(
     val id: String, val sku: String, val name: String, val categoryId: String = "", val categoryName: String = "", val metal: String = "GOLD",
-    val purityLabel: String = "", val purityPermille: Int = 0, val grossMg: Long = 0, val netMg: Long = 0, val stoneLabel: String? = null,
+    val gender: String = "UNISEX", val purityLabel: String = "", val purityPermille: Int = 0, val grossMg: Long = 0, val netMg: Long = 0, val stoneLabel: String? = null,
     val makingBp: Int = 0, val tags: List<String> = emptyList(), val imageUrl: String? = null, val description: String? = null,
     val price: Price = Price(), val stock: Int = 0, val wished: Boolean = false, val createdAt: String? = null,
 )
@@ -93,7 +105,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class QtyRequest(val qty: Int)
 @Serializable data class BagLine(val lineId: String, val qty: Int, val stock: Int, val lineBasePaise: Long, val item: Item)
 @Serializable data class BagTotals(
-    val subtotalPaise: Long = 0, val gstPaise: Long = 0, val gstBasisPoints: Int = 300, val pointsUsed: Long = 0, val pointsValuePaise: Long = 0,
+    val itemsTotalPaise: Long = 0, val offerDiscountPaise: Long = 0, val subtotalPaise: Long = 0, val gstPaise: Long = 0, val gstBasisPoints: Int = 300, val pointsUsed: Long = 0, val pointsValuePaise: Long = 0,
     val schemeUsedPaise: Long = 0, val payablePaise: Long = 0, val pointsEarned: Long = 0,
 )
 @Serializable data class Redeem(val points: Long = 0, val canRedeem: Boolean = false, val minRedeem: Long = 0, val maxRedeemPct: Int = 0, val schemeCreditPaise: Long = 0)
@@ -103,9 +115,19 @@ import kotlinx.serialization.Serializable
     val signedIn: Boolean = false, val lines: List<BagLine> = emptyList(), val count: Int = 0, val totals: BagTotals = BagTotals(),
     val redeem: Redeem = Redeem(), val panBlocked: Boolean = false, val panAbovePaise: Long = 0,
     val outOfStock: List<OutOfStock> = emptyList(), val methods: List<PayMethod> = emptyList(),
+    val offer: AppliedOffer? = null, val offerError: String? = null, val offers: List<BagOffer> = emptyList(),
+)
+/** A special offer this bag could redeem, with what it would save, or why it can't be used. */
+@Serializable data class BagOffer(
+    val id: String, val title: String, val summary: String = "", val slug: String = "", val label: String = "", val code: String? = null,
+    val endsAt: String = "", val discountPaise: Long = 0, val available: Boolean = false, val reason: String? = null,
+)
+/** The offer applied to the bag; [lines] maps bag line id → discount in paise. */
+@Serializable data class AppliedOffer(
+    val id: String, val title: String, val code: String? = null, val label: String = "", val discountPaise: Long = 0, val lines: Map<String, Long> = emptyMap(),
 )
 @Serializable data class WishlistResponse(val signedIn: Boolean = false, val items: List<Item> = emptyList())
-@Serializable data class CheckoutRequest(val usePoints: Boolean, val useScheme: Boolean, val method: String)
+@Serializable data class CheckoutRequest(val usePoints: Boolean, val useScheme: Boolean, val method: String, val offerId: String? = null)
 
 @Serializable data class Prefill(val name: String = "", val email: String? = null, val contact: String? = null)
 /** How to collect a payment: "razorpay" (open the SDK), "mock" (development only) or "done" (nothing to pay). */
@@ -113,7 +135,7 @@ import kotlinx.serialization.Serializable
     val mode: String, val paymentId: String, val razorpayOrderId: String? = null, val keyId: String? = null, val amountPaise: Long = 0,
     val name: String = "", val description: String = "", val prefill: Prefill? = null,
 )
-@Serializable data class CheckoutResponse(val orderId: String, val orderNumber: String, val payablePaise: Long = 0, val payment: PaymentStart)
+@Serializable data class CheckoutResponse(val orderId: String, val orderNumber: String, val payablePaise: Long = 0, val offerDiscountPaise: Long = 0, val payment: PaymentStart)
 @Serializable data class PaymentStartResponse(val payment: PaymentStart)
 @Serializable data class OrderRef(val id: String, val number: String, val status: String)
 @Serializable data class PaymentStatus(
@@ -172,14 +194,23 @@ import kotlinx.serialization.Serializable
 
 @Serializable data class Stage(val key: String, val label: String)
 @Serializable data class OrderBranch(val id: String, val name: String, val city: String)
-@Serializable data class OrderLine(val itemId: String, val name: String, val qty: Int, val unitPricePaise: Long, val netMg: Long = 0)
+@Serializable data class OrderLine(
+    val itemId: String, val name: String, val qty: Int, val unitPricePaise: Long, val discountPaise: Long = 0, val netMg: Long = 0, val huids: List<String> = emptyList(),
+)
+@Serializable data class OrderOffer(val id: String? = null, val title: String? = null, val code: String? = null, val discountPaise: Long = 0)
+@Serializable data class TrackingEvent(val at: String, val status: String, val location: String? = null)
+@Serializable data class Shipment(
+    val courier: String? = null, val awb: String, val trackingUrl: String? = null, val status: String? = null,
+    val shippedAt: String? = null, val deliveredAt: String? = null, val events: List<TrackingEvent> = emptyList(),
+)
 @Serializable data class OrderEvent(val status: String, val label: String, val timestamp: String)
 @Serializable data class Order(
     val id: String, val number: String, val status: String, val statusLabel: String = "", val stageIndex: Int = -1, val stages: List<Stage> = emptyList(),
+    val offer: OrderOffer? = null,
     val subtotalPaise: Long = 0, val gstPaise: Long = 0, val pointsUsed: Long = 0, val pointsValuePaise: Long = 0, val schemeUsedPaise: Long = 0,
     val payablePaise: Long = 0, val pointsEarned: Long = 0, val paymentMethod: String? = null, val branch: OrderBranch? = null,
     val createdAt: String? = null, val paidAt: String? = null, val invoiceAvailable: Boolean = false,
-    val lines: List<OrderLine> = emptyList(), val history: List<OrderEvent> = emptyList(),
+    val lines: List<OrderLine> = emptyList(), val shipment: Shipment? = null, val history: List<OrderEvent> = emptyList(),
 )
 @Serializable data class OrdersResponse(val orders: List<Order> = emptyList())
 @Serializable data class OrderResponse(val order: Order)
@@ -194,3 +225,16 @@ import kotlinx.serialization.Serializable
 )
 @Serializable data class MandateRequest(val upi: String, val maxPaise: Long)
 @Serializable data class BankRequest(val holder: String, val accountNumber: String, val ifsc: String)
+
+// ---------------------------------------------------------------- trading (same as /account/trading)
+@Serializable data class TradingWindow(val available: Boolean = false, val open: Boolean = false, val start: String = "", val end: String = "", val weekend: Boolean = false)
+@Serializable data class TradeRequest(
+    val id: String, val metal: String, val side: String, val amountPaise: Long, val refRatePaisePerGram: Long = 0, val status: String,
+    val executedRatePaisePerGram: Long? = null, val executedMg: Long? = null, val reason: String? = null, val refundStatus: String? = null,
+    val createdAt: String? = null,
+)
+@Serializable data class Trading(
+    val window: TradingWindow = TradingWindow(), val goldPaisePerGram: Long = 0, val silverPaisePerGram: Long = 0, val rateUpdatedAt: String? = null,
+    val minAmountPaise: Long = 0, val maxAmountPaise: Long = 0, val kycLocked: Boolean = true, val requests: List<TradeRequest> = emptyList(),
+)
+@Serializable data class TradeRequestBody(val metal: String, val side: String = "BUY", val amountPaise: Long)

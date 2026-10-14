@@ -20,11 +20,13 @@ are always computed on the server.
 | Area | Screens |
 |---|---|
 | Sign-in | OTP to mobile or email, new-customer sign-up, sign out, sign out of all devices |
-| Shop | Home (hero, today's rate, categories, bestsellers, new arrivals, plan promo), shop with search, metal, category and price-band filters and sorting, product detail with price breakup and showroom stock, wishlist |
-| Checkout | Bag with quantity changes, redeem points and plan balance, PAN/KYC and stock checks, payment method, Razorpay payment |
+| Shop | Home (hero, the owner's chosen rate strip, categories, bestsellers, For her / For him edits, new arrivals, plan promo), shop with search, metal, category and price-band filters and sorting (only the metals the store sells), product detail with price breakup, showroom stock and Ask on WhatsApp, wishlist |
+| Men / Women views | Men \| Women switch on Home and Shop: shows that gender's pieces plus unisex ones and re-themes the whole app (Men: navy and steel, sans-serif headings, squarer shapes; Women: rose and wine, italic serif headlines, pill buttons). Tap the chosen view again (or double-tap) for every item and the normal look. Remembered across launches |
+| Checkout | Bag with quantity changes, special offers (redeem a listed offer or enter an offer code, savings shown per piece), redeem points and plan balance, PAN/KYC and stock checks, payment method, Razorpay payment |
 | Wallet | Total value, gold/silver/points/plan/cash balances, buy digital gold or silver, convert points to gold, sell gold, recent activity, complete history with filters |
+| Trading | Buy digital gold/silver at the dealt rate during trading hours, estimate at today's rate, your requests with status, cancel a pending request for a refund (shown only when the store has turned Trading on) |
 | Plans | Your plans with instalment tracker, pay the next instalment, join a plan |
-| Orders | Order list with tracking stages, order detail with status history, invoice PDF download |
+| Orders | Order list with tracking stages, order detail with redeemed offer, courier/AWB tracking and events, BIS HUIDs, status history, invoice PDF download |
 | Invoices | Invoices for paid orders (PDF) |
 | Payment methods | UPI Autopay mandates, saved cards, withdrawal bank account |
 | Profile & KYC | Personal details, email verification, KYC with PAN and address-proof upload |
@@ -76,7 +78,7 @@ come back. In development (`PAYMENTS_MOCK=true`) a "Development payment" dialog 
 app/src/main/java/com/suvrnika/app/
   data/         API DTOs (Models.kt), Retrofit API, token storage, OkHttp auth + refresh, Repository
   payment/      PaymentCoordinator: Razorpay SDK, dev mock, reconciliation
-  ui/           AppNav (shell, bottom bar, routes), theme (website palette), shared components
+  ui/           AppNav (shell, bottom bar, routes), theme (website palettes + Men/Women views), shared components
   ui/screens/   Store, Login, Account (wallet/history/plans/orders/invoices), Profile/KYC/payment methods, Info screens
   util/         Formatting identical to the website (₹ with Indian grouping, grams, IST dates)
 ```

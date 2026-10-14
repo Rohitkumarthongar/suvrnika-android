@@ -4,9 +4,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Search
+import com.suvrnika.app.ui.components.GenderSwitch
 import com.suvrnika.app.ui.components.OfferPopupHost
 import com.suvrnika.app.ui.theme.Display
 import androidx.compose.foundation.layout.size
@@ -88,6 +91,7 @@ import com.suvrnika.app.ui.screens.ProductScreen
 import com.suvrnika.app.ui.screens.ProfileScreen
 import com.suvrnika.app.ui.screens.ShopScreen
 import com.suvrnika.app.ui.screens.StoresScreen
+import com.suvrnika.app.ui.screens.TradingScreen
 import com.suvrnika.app.ui.screens.WalletScreen
 import com.suvrnika.app.ui.screens.WishlistScreen
 import com.suvrnika.app.ui.theme.Brand
@@ -109,8 +113,11 @@ private val TITLES = mapOf(
     "product" to "", "login" to "Sign in", "wallet" to "Wallet", "history" to "Complete history", "plans" to "Savings plans",
     "orders" to "Orders", "order" to "Order", "invoices" to "Invoices", "payments" to "Payment methods", "profile" to "Profile & KYC",
     "stores" to "Find a showroom", "calculator" to "Metal value calculator", "offers" to "Current offers", "offer" to "Offer",
-    "journal" to "Journal", "post" to "Journal", "help" to "Help & support",
+    "journal" to "Journal", "post" to "Journal", "help" to "Help & support", "trading" to "Trading",
 )
+
+/** Screens that show the Men | Women switch under the header (the storefront views). */
+private val VIEW_ROUTES = setOf("home", "shop")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -163,7 +170,7 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
         val isTab = TABS.any { it.route == route }
         Scaffold(
             snackbarHost = { SnackbarHost(snack) },
-            topBar = {
+            topBar = { Column {
                 if (isTab) TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -188,7 +195,11 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
                     navigationIcon = { IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Brand.Ivory),
                 )
-            },
+                if (route in VIEW_ROUTES) Row(
+                    Modifier.fillMaxWidth().background(Brand.Ivory).padding(horizontal = 16.dp).padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) { GenderSwitch() }
+            } },
             bottomBar = {
                 NavigationBar(containerColor = androidx.compose.ui.graphics.Color.White) {
                     TABS.forEach { t ->
@@ -241,6 +252,7 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
                 composable("journal") { JournalScreen() }
                 composable("post/{slug}") { e -> PostScreen(e.arguments?.getString("slug").orEmpty()) }
                 composable("help") { HelpScreen() }
+                composable("trading") { TradingScreen() }
             }
         }
         OfferPopupHost(currentRoute = route, blocked = mock != null)
