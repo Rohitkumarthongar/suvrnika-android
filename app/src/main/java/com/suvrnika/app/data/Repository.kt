@@ -26,6 +26,8 @@ class Upload(val name: String, val mimeType: String, val bytes: ByteArray)
  */
 class Repository(private val context: Context, val tokens: TokenStore) {
     val api: SuvrnikaApi
+    /** App updates from the store's GitHub releases. */
+    val updater = AppUpdater(context)
     private val http: okhttp3.OkHttpClient
 
     init {

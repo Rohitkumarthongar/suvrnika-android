@@ -1,0 +1,114 @@
+# Builds a signed APK and publishes it as a GitHub release. The app checks the latest release and offers it to
+# customers as an update (automatic pop-up, and Account → App settings → Check for updates).
+#
+# Runs when:
+#   - the store's logo or app icon changes (the server sends `app-icon-changed`, see ANDROID_BUILD_TOKEN), so the
+#     launcher icon always follows Admin → Company setup;
+#   - app code is pushed to main;
+#   - someone runs it from the Actions tab (optionally with release notes).
+#
+# One-time setup (repository Settings → Secrets and variables → Actions):
+#   Secrets   SUVRNIKA_KEYSTORE_BASE64   base64 of the release keystore (keep the .jks safe: every update must use it)
+#             SUVRNIKA_KEYSTORE_PASSWORD, SUVRNIKA_KEY_ALIAS, SUVRNIKA_KEY_PASSWORD
+#   Variables SUVRNIKA_API_URL (default https://suvrnika.kodaic.cloud/), SUVRNIKA_ICON_BACKGROUND (default #FFFFFF)
+name: Release Android app
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', 'build.gradle.kts', 'settings.gradle.kts', 'gradle/**', 'scripts/brand_icon.py', '.github/workflows/release.yml']
+  repository_dispatch:
+    types: [app-icon-changed]
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: What changed (shown to customers in the update pop-up)
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+env:
+  API_URL: ${{ vars.SUVRNIKA_API_URL || 'https://suvrnika.kodaic.cloud/' }}
+  ICON_BACKGROUND: ${{ vars.SUVRNIKA_ICON_BACKGROUND || '#FFFFFF' }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check signing secrets
+        env:
+          KS: ${{ secrets.SUVRNIKA_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.SUVRNIKA_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SUVRNIKA_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.SUVRNIKA_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KS" ] || [ -z "$KS_PASS" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASS" ]; then
+            echo "::error::Add the SUVRNIKA_KEYSTORE_BASE64, SUVRNIKA_KEYSTORE_PASSWORD, SUVRNIKA_KEY_ALIAS and SUVRNIKA_KEY_PASSWORD secrets (see the top of this file)."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # gradle.properties may pin a developer's local JDK path; the user-level file takes precedence.
+      - name: Use the runner's JDK
+        run: mkdir -p ~/.gradle && echo "org.gradle.java.home=$JAVA_HOME" >> ~/.gradle/gradle.properties
+
+      - name: Launcher icon from Company setup
+        run: |
+          pip install --quiet pillow==11.0.0
+          python3 scripts/brand_icon.py --api "$API_URL" --background "$ICON_BACKGROUND"
+
+      - name: Version
+        id: v
+        # Local builds are versionCode 1, so every published release is newer than any build already installed.
+        run: |
+          echo "code=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_OUTPUT"
+          echo "name=1.1.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed APK
+        env:
+          KS: ${{ secrets.SUVRNIKA_KEYSTORE_BASE64 }}
+          SUVRNIKA_KEYSTORE_PASSWORD: ${{ secrets.SUVRNIKA_KEYSTORE_PASSWORD }}
+          SUVRNIKA_KEY_ALIAS: ${{ secrets.SUVRNIKA_KEY_ALIAS }}
+          SUVRNIKA_KEY_PASSWORD: ${{ secrets.SUVRNIKA_KEY_PASSWORD }}
+        run: |
+          echo "$KS" | base64 -d > "$RUNNER_TEMP/release.jks"
+          export SUVRNIKA_KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
+          ./gradlew --no-daemon assembleRelease \
+            -PsuvrnikaApiUrl="$API_URL" \
+            -PappVersionCode="${{ steps.v.outputs.code }}" \
+            -PappVersionName="${{ steps.v.outputs.name }}"
+          rm -f "$RUNNER_TEMP/release.jks"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODE: ${{ steps.v.outputs.code }}
+          NAME: ${{ steps.v.outputs.name }}
+          NOTES: ${{ github.event.inputs.notes || github.event.client_payload.notes || github.event.head_commit.message }}
+        run: |
+          apk="suvrnika-$NAME.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$apk"
+          sha=$(sha256sum "$apk" | cut -d' ' -f1)
+          summary=$(printf '%s' "$NOTES" | head -n 1)
+          # The app reads the hidden line to compare versions and verify the download.
+          printf '%s\n\n<!-- suvrnika:versionCode=%s sha256=%s -->\n' "${summary:-Improvements and fixes.}" "$CODE" "$sha" > notes.md
+          gh release create "v$NAME" "$apk" --title "Suvrnika $NAME" --notes-file notes.md --latest
