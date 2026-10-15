@@ -125,6 +125,8 @@ import com.suvrnika.app.data.Rates
 import com.suvrnika.app.util.count
 import com.suvrnika.app.util.grams
 import com.suvrnika.app.util.inr
+import com.suvrnika.app.util.inr2
+import com.suvrnika.app.util.inr2Signed
 import com.suvrnika.app.util.metalLabel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -152,7 +154,7 @@ fun rememberActionKey(): ActionKey {
 }
 
 // ---------------------------------------------------------------- home
-private class HomeData(val catalogue: CatalogueResponse, val offers: List<Offer>, val posts: List<Post>, val rates: Rates?)
+private class HomeData(val catalogue: CatalogueResponse, val offers: List<Offer>, val posts: List<Post>, val rates: Rates?, val reviews: com.suvrnika.app.data.TestimonialsResponse?)
 
 /** Home hero copy for the Men / Women views (the website's GENDER_HERO). */
 private val GENDER_HERO = mapOf(
@@ -191,7 +193,8 @@ fun HomeScreen() {
             val offers = async { runCatching { call { offers() }.offers }.getOrDefault(emptyList()) }
             val posts = async { runCatching { call { journal() }.posts }.getOrDefault(emptyList()) }
             val rates = async { runCatching { call { rates() } }.getOrNull() }
-            HomeData(cat.await(), offers.await(), posts.await(), rates.await())
+            val reviews = async { runCatching { call { testimonials() } }.getOrNull() }
+            HomeData(cat.await(), offers.await(), posts.await(), rates.await(), reviews.await())
         }
     }
     val open = { i: Item -> nav.navigate("product/${i.sku}") }
@@ -253,7 +256,7 @@ fun HomeScreen() {
                     Column(Modifier.weight(1f)) { Eyebrow("Today's rate"); Muted("Tap for the metal calculator") }
                     Column(horizontalAlignment = Alignment.End) {
                         ticker.take(4).forEachIndexed { n, t ->
-                            Text("${t.label}  ${inr(t.paisePerGram)}/g", fontWeight = if (n == 0) FontWeight.Bold else FontWeight.Normal, color = if (n == 0) Brand.Ink else Brand.Body, fontSize = if (n == 0) 14.sp else 13.sp)
+                            Text("${t.label}  ${inr2(t.paisePerGram)}/g", fontWeight = if (n == 0) FontWeight.Bold else FontWeight.Normal, color = if (n == 0) Brand.Ink else Brand.Body, fontSize = if (n == 0) 14.sp else 13.sp)
                         }
                     }
                 }
@@ -342,6 +345,9 @@ fun HomeScreen() {
                     items(home.posts.take(6), key = { it.id }) { p -> JournalCard(p, onOpen = { nav.navigate("post/${p.slug}") }, modifier = Modifier.width(260.dp)) }
                 }
             }
+        }
+        home.reviews?.let { r ->
+            item { com.suvrnika.app.ui.components.TestimonialsSection(r, onChanged = state::refresh, signIn = { nav.navigate("login") }, openProfile = { nav.navigate("profile") }) }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -527,7 +533,7 @@ fun ProductScreen(sku: String) {
                 Eyebrow("${metalLabel(i.metal)} · ${i.purityLabel}" + if (i.gender != "UNISEX") " · for ${StoreView.LABEL[i.gender]?.lowercase()}" else "")
                 Text(i.name, style = MaterialTheme.typography.displaySmall)
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(inr(i.price.totalPaise), fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                    Text(inr2(i.price.totalPaise), fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.width(8.dp))
                     Muted("incl. ${p.gstBasisPoints / 100.0}% GST · today's rate")
                 }
@@ -559,12 +565,12 @@ fun ProductScreen(sku: String) {
         item {
             Panel {
                 Eyebrow("Price breakup", Brand.Ink)
-                KeyValue("Metal (${grams(i.netMg)} × rate × ${i.purityPermille / 1000.0})", inr(i.price.metalPaise))
-                KeyValue("Making charges (${i.makingBp / 100.0}%)", inr(i.price.makingPaise))
-                KeyValue("Stone value", inr(i.price.stonePaise))
-                KeyValue("GST ${p.gstBasisPoints / 100.0}%", inr(i.price.gstPaise))
+                KeyValue("Metal (${grams(i.netMg)} × rate × ${i.purityPermille / 1000.0})", inr2(i.price.metalPaise))
+                KeyValue("Making charges (${i.makingBp / 100.0}%)", inr2(i.price.makingPaise))
+                KeyValue("Stone value", inr2(i.price.stonePaise))
+                KeyValue("GST ${p.gstBasisPoints / 100.0}%", inr2(i.price.gstPaise))
                 Divider()
-                KeyValue("Total", inr(i.price.totalPaise), bold = true)
+                KeyValue("Total", inr2(i.price.totalPaise), bold = true)
             }
         }
         item {
@@ -655,9 +661,9 @@ fun BagScreen() {
                     }
                     val off = bag.offer?.lines?.get(l.lineId) ?: 0L
                     if (off > 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(inr(l.lineBasePaise), color = Brand.Muted, textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough, fontSize = 13.sp)
-                        Text(inr(l.lineBasePaise - off), fontWeight = FontWeight.SemiBold, color = Brand.Ok)
-                    } else Text(inr(l.lineBasePaise), fontWeight = FontWeight.SemiBold)
+                        Text(inr2(l.lineBasePaise), color = Brand.Muted, textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough, fontSize = 13.sp)
+                        Text(inr2(l.lineBasePaise - off), fontWeight = FontWeight.SemiBold, color = Brand.Ok)
+                    } else Text(inr2(l.lineBasePaise), fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -670,11 +676,11 @@ fun BagScreen() {
                 val t = bag.totals
                 Text("Order summary", style = MaterialTheme.typography.titleLarge)
                 if (t.offerDiscountPaise > 0) {
-                    KeyValue("Items", inr(t.itemsTotalPaise))
-                    KeyValue("Special offer" + (bag.offer?.title?.let { " · $it" } ?: ""), "−" + inr(t.offerDiscountPaise), valueColor = Brand.Ok)
+                    KeyValue("Items", inr2(t.itemsTotalPaise))
+                    KeyValue("Special offer" + (bag.offer?.title?.let { " · $it" } ?: ""), "−" + inr2(t.offerDiscountPaise), valueColor = Brand.Ok)
                 }
-                KeyValue("Subtotal", inr(t.subtotalPaise))
-                KeyValue("GST ${t.gstBasisPoints / 100.0}%", inr(t.gstPaise))
+                KeyValue("Subtotal", inr2(t.subtotalPaise))
+                KeyValue("GST ${t.gstBasisPoints / 100.0}%", inr2(t.gstPaise))
                 if (bag.signedIn) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
@@ -683,18 +689,19 @@ fun BagScreen() {
                         }
                         Switch(checked = usePoints, enabled = bag.redeem.canRedeem, onCheckedChange = { usePoints = it })
                     }
-                    if (t.pointsUsed > 0) KeyValue("Points (${count(t.pointsUsed)})", "−" + inr(t.pointsValuePaise), valueColor = Brand.Ok)
+                    if (t.pointsUsed > 0) KeyValue("Points (${count(t.pointsUsed)})", "−" + inr2(t.pointsValuePaise), valueColor = Brand.Ok)
                     if (bag.redeem.schemeCreditPaise > 0) Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) { Text("Use plan balance", fontWeight = FontWeight.SemiBold); Muted("${inr(bag.redeem.schemeCreditPaise)} available") }
+                        Column(Modifier.weight(1f)) { Text("Use plan balance", fontWeight = FontWeight.SemiBold); Muted("${inr2(bag.redeem.schemeCreditPaise)} available") }
                         Switch(checked = useScheme, onCheckedChange = { useScheme = it })
                     }
-                    if (t.schemeUsedPaise > 0) KeyValue("Plan balance", "−" + inr(t.schemeUsedPaise), valueColor = Brand.Ok)
+                    if (t.schemeUsedPaise > 0) KeyValue("Plan balance", "−" + inr2(t.schemeUsedPaise), valueColor = Brand.Ok)
                 }
+                if (t.roundOffPaise != 0L) KeyValue("Round off", inr2Signed(t.roundOffPaise))
                 Divider()
-                KeyValue("To pay", inr(t.payablePaise), bold = true)
+                KeyValue("To pay", inr2(t.payablePaise), bold = true)
                 // GST is charged on the reduced value, so the offer saves that GST too.
                 if (t.offerDiscountPaise > 0) Text(
-                    "You save ${inr(t.offerDiscountPaise + t.offerDiscountPaise * t.gstBasisPoints / 10_000)} with this offer (incl. GST).",
+                    "You save ${inr2(t.offerDiscountPaise + t.offerDiscountPaise * t.gstBasisPoints / 10_000)} with this offer (incl. GST).",
                     Modifier.fillMaxWidth().background(Brand.OkBg).padding(10.dp), color = Brand.Ok, fontSize = 13.sp,
                 )
                 Muted("You earn ${count(t.pointsEarned)} points on this order.")
@@ -718,7 +725,7 @@ fun BagScreen() {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 blocked?.let { Text(it, Modifier.fillMaxWidth().background(Brand.BadBg).padding(12.dp), color = Brand.Bad, fontSize = 13.sp) }
                 if (!bag.signedIn) PrimaryButton("Sign in to check out", onClick = { nav.navigate("login") }, modifier = Modifier.fillMaxWidth())
-                else PrimaryButton("Pay ${inr(bag.totals.payablePaise)}", gold = true, busy = runner.busy, enabled = blocked == null, modifier = Modifier.fillMaxWidth(), onClick = {
+                else PrimaryButton("Pay ${inr2(bag.totals.payablePaise)}", gold = true, busy = runner.busy, enabled = blocked == null, modifier = Modifier.fillMaxWidth(), onClick = {
                     val chosen = method ?: bag.methods.firstOrNull()?.key ?: "UPI"
                     runner.run(onDone = reload) {
                         val res = try {
@@ -764,7 +771,7 @@ private fun OfferBox(bag: com.suvrnika.app.data.Bag, code: String, onCode: (Stri
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(o.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    Muted(o.label + " · save ${inr(o.discountPaise)}" + (endsIn(o.endsAt)?.let { " · $it" } ?: ""))
+                    Muted(o.label + " · save ${inr2(o.discountPaise)}" + (endsIn(o.endsAt)?.let { " · $it" } ?: ""))
                 }
                 OutlinedButton(enabled = !busy, onClick = { onRedeem(o.id) }, shape = Brand.ButtonShape) { Text(if (applied != null) "Use this" else "Redeem", color = Brand.Ink) }
             }

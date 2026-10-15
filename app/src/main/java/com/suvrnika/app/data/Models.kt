@@ -105,7 +105,9 @@ import kotlinx.serialization.Serializable
 @Serializable data class QtyRequest(val qty: Int)
 @Serializable data class BagLine(val lineId: String, val qty: Int, val stock: Int, val lineBasePaise: Long, val item: Item)
 @Serializable data class BagTotals(
-    val itemsTotalPaise: Long = 0, val offerDiscountPaise: Long = 0, val subtotalPaise: Long = 0, val gstPaise: Long = 0, val gstBasisPoints: Int = 300, val pointsUsed: Long = 0, val pointsValuePaise: Long = 0,
+    val itemsTotalPaise: Long = 0, val offerDiscountPaise: Long = 0, val subtotalPaise: Long = 0,
+    /** The store's round-off to a whole rupee (negative or positive); already inside [payablePaise]. */
+    val roundOffPaise: Long = 0, val gstPaise: Long = 0, val gstBasisPoints: Int = 300, val pointsUsed: Long = 0, val pointsValuePaise: Long = 0,
     val schemeUsedPaise: Long = 0, val payablePaise: Long = 0, val pointsEarned: Long = 0,
 )
 @Serializable data class Redeem(val points: Long = 0, val canRedeem: Boolean = false, val minRedeem: Long = 0, val maxRedeemPct: Int = 0, val schemeCreditPaise: Long = 0)
@@ -207,6 +209,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class Order(
     val id: String, val number: String, val status: String, val statusLabel: String = "", val stageIndex: Int = -1, val stages: List<Stage> = emptyList(),
     val offer: OrderOffer? = null,
+    val roundOffPaise: Long = 0,
     val subtotalPaise: Long = 0, val gstPaise: Long = 0, val pointsUsed: Long = 0, val pointsValuePaise: Long = 0, val schemeUsedPaise: Long = 0,
     val payablePaise: Long = 0, val pointsEarned: Long = 0, val paymentMethod: String? = null, val branch: OrderBranch? = null,
     val createdAt: String? = null, val paidAt: String? = null, val invoiceAvailable: Boolean = false,
@@ -238,3 +241,14 @@ import kotlinx.serialization.Serializable
     val minAmountPaise: Long = 0, val maxAmountPaise: Long = 0, val kycLocked: Boolean = true, val requests: List<TradeRequest> = emptyList(),
 )
 @Serializable data class TradeRequestBody(val metal: String, val side: String = "BUY", val amountPaise: Long)
+
+// ---------------------------------------------------------------- testimonials (same as the home page section)
+/** A verified customer's public testimonial; [name] is already shortened ("Priya S."). */
+@Serializable data class Testimonial(val id: String, val rating: Int, val body: String, val name: String, val createdAt: String? = null)
+/** The signed-in customer's own testimonial. [hidden] means our team has hidden it from the public list. */
+@Serializable data class MyTestimonial(val id: String, val rating: Int, val body: String, val hidden: Boolean = false, val createdAt: String? = null, val updatedAt: String? = null)
+@Serializable data class TestimonialsResponse(
+    val count: Int = 0, val average: Double = 0.0, val items: List<Testimonial> = emptyList(),
+    val signedIn: Boolean = false, val canWrite: Boolean = false, val mine: MyTestimonial? = null,
+)
+@Serializable data class TestimonialRequest(val rating: Int, val body: String)

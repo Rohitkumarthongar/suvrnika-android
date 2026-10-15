@@ -100,7 +100,7 @@ fun <T> LoadGrid(state: Load<T>, minCell: Dp = 158.dp, content: LazyGridScope.(T
                 val side = maxOf(16.dp, (maxWidth - 1200.dp) / 2)
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minCell), modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = side, vertical = 16.dp),
+                    contentPadding = PaddingValues(start = side, end = side, top = 16.dp, bottom = 88.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) { content(data) }
             }

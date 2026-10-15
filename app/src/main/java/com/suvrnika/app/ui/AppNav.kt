@@ -4,12 +4,15 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Calculate
+import com.suvrnika.app.ui.components.CalculatorButton
 import com.suvrnika.app.ui.components.GenderSwitch
 import com.suvrnika.app.ui.components.LocalUpdates
 import com.suvrnika.app.ui.components.UpdateController
@@ -189,13 +192,6 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
         val isTab = TABS.any { it.route == route }
         Scaffold(
             snackbarHost = { SnackbarHost(snack) },
-            // Metal value calculator, one tap away on the storefront screens.
-            floatingActionButton = {
-                if (route in FAB_ROUTES) androidx.compose.material3.FloatingActionButton(
-                    onClick = { nav.navigate("calculator") { launchSingleTop = true } },
-                    containerColor = Brand.Ink, contentColor = Brand.Ivory, shape = androidx.compose.foundation.shape.CircleShape,
-                ) { Icon(androidx.compose.material.icons.Icons.Outlined.Calculate, contentDescription = "Metal value calculator") }
-            },
             topBar = { Column {
                 if (isTab) TopAppBar(
                     title = {
@@ -261,7 +257,10 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
                 }
             },
         ) { pad ->
-            NavHost(nav, startDestination = "home", modifier = Modifier.padding(pad)) {
+            // The calculator button lives INSIDE the content area (which already stops above the bottom tabs), so it can
+            // never sit on top of a tab, whatever the phone's navigation bar looks like.
+            Box(Modifier.padding(pad)) {
+            NavHost(nav, startDestination = "home", modifier = Modifier.fillMaxSize()) {
                 composable("home") { HomeScreen() }
                 composable(
                     SHOP_ROUTE,
@@ -292,6 +291,11 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
                 composable("help") { HelpScreen() }
                 composable("trading") { TradingScreen() }
                 composable("settings") { SettingsScreen() }
+            }
+            if (route in FAB_ROUTES) CalculatorButton(
+                onClick = { nav.navigate("calculator") { launchSingleTop = true } },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 16.dp),
+            )
             }
         }
         // The update pop-up wins over the promotional pop-up.

@@ -95,6 +95,8 @@ import com.suvrnika.app.util.date
 import com.suvrnika.app.util.delta
 import com.suvrnika.app.util.grams
 import com.suvrnika.app.util.inr
+import com.suvrnika.app.util.inr2
+import com.suvrnika.app.util.inr2Signed
 import com.suvrnika.app.util.mobile
 import kotlinx.coroutines.launch
 
@@ -251,7 +253,7 @@ fun WalletScreen() {
                 if (metals.size > 1) Options(metals.map { it to metalLabel(it) }, metal) { picked = it }
                 Options(listOf(1000L, 5000L, 10000L).map { it.toString() to inr(it * 100) }, amount.toString()) { amount = it.toLong() }
                 val rate = if (metal == "GOLD") w.rates.goldPaisePerGram else w.rates.silverPaisePerGram
-                Text("You receive ${grams(if (rate > 0) amount * 100 * 1000 / rate else 0L)} of ${metal.lowercase()}, rate locked at ${inr(rate)}/g.", color = Brand.Body, fontSize = 14.sp)
+                Text("You receive ${grams(if (rate > 0) amount * 100 * 1000 / rate else 0L)} of ${metal.lowercase()}, rate locked at ${inr2(rate)}/g.", color = Brand.Body, fontSize = 14.sp)
                 if (w.kycLocked) Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("KYC required to buy digital metal.", color = Brand.Bad, fontSize = 13.sp)
                     TextButton(onClick = { nav.navigate("profile") }) { Text("Verify now", color = Brand.Bad) }
@@ -284,7 +286,7 @@ fun WalletScreen() {
                 Text("Sell gold to cash", style = MaterialTheme.typography.headlineSmall)
                 Options(listOf(100L, 500L, 1000L).map { it.toString() to "%.1f g".format(it / 1000.0) }, sellMg.toString()) { sellMg = it.toLong() }
                 val n = minOf(sellMg, b.goldMg)
-                Text("Selling ${grams(n)} adds ${inr(n * w.rates.goldPaisePerGram / 1000)} to your wallet cash.", color = Brand.Body, fontSize = 14.sp)
+                Text("Selling ${grams(n)} adds ${inr2(n * w.rates.goldPaisePerGram / 1000)} to your wallet cash.", color = Brand.Body, fontSize = 14.sp)
                 GhostButton("Sell gold", enabled = !runner.busy && n > 0 && !w.kycLocked, modifier = Modifier.fillMaxWidth(), onClick = {
                     runner.run(onDone = state::refresh) { repo.call { sellGold(repo.newIdempotencyKey(), com.suvrnika.app.data.SellGoldRequest(n)) }.message }
                 })
@@ -441,7 +443,7 @@ fun OrdersScreen() {
                 Text(o.lines.joinToString { "${it.name} × ${it.qty}" }, style = MaterialTheme.typography.titleLarge)
                 Muted("${o.number} · Ordered ${date(o.createdAt)}" + (o.branch?.let { " · from ${it.city}" } ?: ""))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(inr(o.payablePaise), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    Text(inr2(o.payablePaise), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                     Chip(o.statusLabel, when (o.status) { "CANCELLED" -> Tone.Bad; "PENDING_PAYMENT" -> Tone.Warn; "DELIVERED" -> Tone.Ok; else -> Tone.Neutral })
                 }
                 if (o.stageIndex >= 0) StageBar(o.stages.map { it.label }, o.stageIndex)
@@ -505,18 +507,19 @@ fun OrderScreen(id: String) {
         item {
             Panel {
                 o.lines.forEach { l ->
-                    KeyValue("${l.name} × ${l.qty}", inr(l.unitPricePaise * l.qty))
-                    if (l.discountPaise > 0) KeyValue("   Offer discount", "−" + inr(l.discountPaise), valueColor = Brand.Ok)
+                    KeyValue("${l.name} × ${l.qty}", inr2(l.unitPricePaise * l.qty))
+                    if (l.discountPaise > 0) KeyValue("   Offer discount", "−" + inr2(l.discountPaise), valueColor = Brand.Ok)
                 }
                 Divider()
                 o.offer?.takeIf { it.discountPaise > 0 }?.let { f ->
-                    KeyValue("Special offer" + (f.title?.let { " · $it" } ?: "") + (f.code?.let { " ($it)" } ?: ""), "−" + inr(f.discountPaise), valueColor = Brand.Ok)
+                    KeyValue("Special offer" + (f.title?.let { " · $it" } ?: "") + (f.code?.let { " ($it)" } ?: ""), "−" + inr2(f.discountPaise), valueColor = Brand.Ok)
                 }
-                KeyValue("Subtotal", inr(o.subtotalPaise))
-                KeyValue("GST", inr(o.gstPaise))
-                if (o.pointsUsed > 0) KeyValue("Points (${count(o.pointsUsed)})", "−" + inr(o.pointsValuePaise), valueColor = Brand.Ok)
-                if (o.schemeUsedPaise > 0) KeyValue("Plan balance", "−" + inr(o.schemeUsedPaise), valueColor = Brand.Ok)
-                KeyValue("Paid", inr(o.payablePaise), bold = true)
+                KeyValue("Subtotal", inr2(o.subtotalPaise))
+                KeyValue("GST", inr2(o.gstPaise))
+                if (o.pointsUsed > 0) KeyValue("Points (${count(o.pointsUsed)})", "−" + inr2(o.pointsValuePaise), valueColor = Brand.Ok)
+                if (o.schemeUsedPaise > 0) KeyValue("Plan balance", "−" + inr2(o.schemeUsedPaise), valueColor = Brand.Ok)
+                if (o.roundOffPaise != 0L) KeyValue("Round off", inr2Signed(o.roundOffPaise))
+                KeyValue("Paid", inr2(o.payablePaise), bold = true)
                 if (o.pointsEarned > 0 && o.status != "CANCELLED" && o.status != "PENDING_PAYMENT") Muted("+${count(o.pointsEarned)} points earned")
             }
         }
@@ -579,7 +582,7 @@ fun InvoicesScreen() {
                 Text(inv.invoiceNumber, style = MaterialTheme.typography.headlineSmall)
                 Muted("${inv.orderNumber} · paid ${date(inv.paidAt)}")
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(inr(inv.payablePaise), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text(inr2(inv.payablePaise), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     TextButton(enabled = !invoice.busy, onClick = { invoice.open(inv.orderId, inv.invoiceNumber) }) { Text("Download PDF", color = Brand.Gold) }
                 }
             }
@@ -641,7 +644,7 @@ fun TradingScreen() {
                 val rate = if (metal == "GOLD") t.goldPaisePerGram else t.silverPaisePerGram
                 Column(Modifier.fillMaxWidth().background(Brand.GoldPale).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        "About ${grams(if (rate > 0) paise * 1000 / rate else 0L)} of ${metal.lowercase()} at our store rate of ${inr(rate)}/g" +
+                        "About ${grams(if (rate > 0) paise * 1000 / rate else 0L)} of ${metal.lowercase()} at our store rate of ${inr2(rate)}/g" +
                             (t.rateUpdatedAt?.let { " (updated ${date(it)})" } ?: "") + ".",
                         color = Brand.OnGoldPale, fontSize = 14.sp,
                     )
@@ -674,7 +677,7 @@ fun TradingScreen() {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("${if (r.side == "BUY") "Buy" else "Sell"} ${r.metal.lowercase()} · ${inr(r.amountPaise)}", fontWeight = FontWeight.SemiBold)
-                        Muted(date(r.createdAt) + " · " + if (r.status == "EXECUTED" && r.executedMg != null) "${grams(r.executedMg)} @ ${inr(r.executedRatePaisePerGram ?: 0L)}/g" else "ref. ${inr(r.refRatePaisePerGram)}/g")
+                        Muted(date(r.createdAt) + " · " + if (r.status == "EXECUTED" && r.executedMg != null) "${grams(r.executedMg)} @ ${inr2(r.executedRatePaisePerGram ?: 0L)}/g" else "ref. ${inr2(r.refRatePaisePerGram)}/g")
                     }
                     Chip(TRADE_STATUS[r.status] ?: r.status, when (r.status) { "EXECUTED" -> Tone.Ok; "REJECTED" -> Tone.Bad; "PENDING" -> Tone.Warn; else -> Tone.Neutral })
                 }
