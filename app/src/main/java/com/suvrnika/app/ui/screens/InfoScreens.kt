@@ -141,12 +141,13 @@ fun CalculatorScreen() {
     var metal by rememberSaveable { mutableStateOf("GOLD") }
     var weight by rememberSaveable { mutableStateOf("10") }
     var purity by rememberSaveable { mutableStateOf("916") }
-    var gold by rememberSaveable(rates) { mutableStateOf(((rates?.goldPaisePerGram ?: 0) / 100.0).toString()) }
-    var silver by rememberSaveable(rates) { mutableStateOf(((rates?.silverPaisePerGram ?: 0) / 100.0).toString()) }
+    // Today's rates to the paisa (12779.10, not 12779.1), so the estimate starts from the exact store rate.
+    var gold by rememberSaveable(rates) { mutableStateOf(com.suvrnika.app.util.rupeeInput(rates?.goldPaisePerGram ?: 0)) }
+    var silver by rememberSaveable(rates) { mutableStateOf(com.suvrnika.app.util.rupeeInput(rates?.silverPaisePerGram ?: 0)) }
     var making by rememberSaveable { mutableStateOf("10") }
     var stone by rememberSaveable { mutableStateOf("0") }
     var qty by rememberSaveable { mutableStateOf("1") }
-    var gst by rememberSaveable(rates) { mutableStateOf(((rates?.gstBasisPoints ?: 300) / 100.0).toString()) }
+    var gst by rememberSaveable(rates) { mutableStateOf(String.format(java.util.Locale.US, "%.2f", (rates?.gstBasisPoints ?: 300) / 100.0)) }
 
     fun n(s: String) = max(0.0, s.toDoubleOrNull() ?: 0.0)
     val quantity = max(1.0, floor(s2d(qty))).toLong()
@@ -181,7 +182,7 @@ fun CalculatorScreen() {
             Divider()
             Eyebrow("Total for $quantity piece(s)", Brand.Muted)
             Text(money((base + gstPer) * quantity), style = MaterialTheme.typography.displaySmall, color = Brand.Gold)
-            Muted("Using ${money(rate)} per gram × ${n(weight)} g at ${n(purity).toLong()}‰ purity.")
+            Muted("Using ${money(rate)} per gram × ${java.text.DecimalFormat("0.###").format(n(weight))} g at ${java.text.DecimalFormat("0.##").format(n(purity))}‰ purity.")
         }
     }
 }

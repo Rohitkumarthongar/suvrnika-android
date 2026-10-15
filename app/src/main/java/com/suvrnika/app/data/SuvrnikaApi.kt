@@ -77,6 +77,10 @@ interface SuvrnikaApi {
     @POST("api/v1/wallet/convert-points") suspend fun convertPoints(@Header("Idempotency-Key") key: String, @Body body: PointsRequest): ActionResult
     @POST("api/v1/wallet/sell-gold") suspend fun sellGold(@Header("Idempotency-Key") key: String, @Body body: SellGoldRequest): ActionResult
 
+    @GET("api/v1/testimonials") suspend fun testimonials(): TestimonialsResponse
+    @POST("api/v1/testimonials") suspend fun saveTestimonial(@Body body: TestimonialRequest): ActionResult
+    @DELETE("api/v1/testimonials") suspend fun deleteTestimonial(): ActionResult
+
     @GET("api/v1/trading") suspend fun trading(): Trading
     @POST("api/v1/trading") suspend fun tradeRequest(@Header("Idempotency-Key") key: String, @Body body: TradeRequestBody): PaymentStartResponse
     @POST("api/v1/trading/{id}/cancel") suspend fun cancelTrade(@Path("id") id: String): ActionResult

@@ -14,6 +14,12 @@ private val IST = ZoneId.of("Asia/Kolkata")
 private val group = NumberFormat.getIntegerInstance(IN)
 
 fun inr(paise: Long): String = "₹" + group.format((paise / 100.0).roundToLong())
+/** Rupees and paise (₹12,779.10): for rates and anything where the paise matter. */
+fun inr2(paise: Long): String = "₹" + NumberFormat.getNumberInstance(IN).apply { minimumFractionDigits = 2; maximumFractionDigits = 2 }.format(paise / 100.0)
+/** An adjustment such as a round-off: −₹0.40 or +₹0.60. */
+fun inr2Signed(paise: Long): String = (if (paise < 0) "−" else if (paise > 0) "+" else "") + inr2(kotlin.math.abs(paise))
+/** A rupee amount for an input box, always with paise: 12779.10. */
+fun rupeeInput(paise: Long): String = String.format(Locale.US, "%.2f", paise / 100.0)
 fun grams(mg: Long): String = String.format(Locale.US, "%.3f g", mg / 1000.0)
 fun count(n: Long): String = group.format(n)
 fun mobile(m: String?): String = if (m.isNullOrBlank()) "—" else "+91 ${m.take(5)} ${m.drop(5)}"

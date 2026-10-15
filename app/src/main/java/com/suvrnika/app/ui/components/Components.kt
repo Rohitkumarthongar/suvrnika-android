@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.Diamond
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Button
@@ -144,7 +145,7 @@ fun <T> LoadList(state: Load<T>, modifier: Modifier = Modifier, content: LazyLis
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 // Phones use the full width; on tablets the column stays at a comfortable reading width.
                 val side = maxOf(16.dp, (maxWidth - MAX_CONTENT_WIDTH) / 2)
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = side, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = side, end = side, top = 16.dp, bottom = 88.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     content(data)
                 }
             }
@@ -310,6 +311,22 @@ fun ProductCard(item: Item, onOpen: () -> Unit, onWish: (() -> Unit)?, modifier:
             Text("${item.purityLabel} · ${"%.1f".format(item.netMg / 1000.0)} g".uppercase(), style = MaterialTheme.typography.labelSmall, color = Brand.Muted, maxLines = 1)
             Text(item.name, style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp, lineHeight = 22.sp), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.height(44.dp))
             Text(inr(item.price.basePaise), fontWeight = FontWeight.Bold, color = Brand.Ink)
+        }
+    }
+}
+
+/**
+ * The metal-calculator shortcut: a small round button in the theme's gold (so it follows the Men / Women colours),
+ * with a soft ring and shadow. Draw it inside the content area, above the bottom tabs.
+ */
+@Composable
+fun CalculatorButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    androidx.compose.material3.Surface(
+        onClick = onClick, modifier = modifier.size(48.dp), shape = CircleShape, color = Brand.GoldPale, contentColor = Brand.Gold,
+        shadowElevation = 6.dp, border = androidx.compose.foundation.BorderStroke(1.5.dp, Brand.Gold),
+    ) {
+        Box(Modifier.fillMaxSize(), Alignment.Center) {
+            Icon(androidx.compose.material.icons.Icons.Outlined.Calculate, contentDescription = "Metal value calculator", modifier = Modifier.size(24.dp))
         }
     }
 }
