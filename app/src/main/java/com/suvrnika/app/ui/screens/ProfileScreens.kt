@@ -1,6 +1,13 @@
 package com.suvrnika.app.ui.screens
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Matrix
+import androidx.exifinterface.media.ExifInterface
+import java.io.ByteArrayOutputStream
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -142,6 +149,9 @@ private fun displayName(context: Context, uri: Uri): String? = runCatching {
     context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null }
 }.getOrNull()
 
+/** Longest side of an uploaded photo. A PAN card or Aadhaar stays perfectly readable at this size. */
+private const val MAX_PHOTO_EDGE = 2000
+
 private suspend fun readUpload(context: Context, uri: Uri): Upload = withContext(Dispatchers.IO) {
     val cr = context.contentResolver
     var name = "document"
@@ -152,10 +162,54 @@ private suspend fun readUpload(context: Context, uri: Uri): Upload = withContext
             if (!cur.isNull(1)) size = cur.getLong(1)
         }
     }
+    val type = cr.getType(uri) ?: "application/octet-stream"
+    // Photos are shrunk here (a phone camera gives 4–12 MB), so the upload is fast, small and fits the server's limits.
+    if (type.startsWith("image/")) return@withContext shrinkPhoto(context, uri, name)
     if (size > MAX_UPLOAD_BYTES) throw ApiException("File must be under 15 MB.")
     val bytes = cr.openInputStream(uri)?.use { it.readBytes() } ?: throw ApiException("Could not read that file.")
     if (bytes.size > MAX_UPLOAD_BYTES) throw ApiException("File must be under 15 MB.")
-    Upload(name, cr.getType(uri) ?: "application/octet-stream", bytes)
+    Upload(name, type, bytes)
+}
+
+/** Decodes a photo at reduced size, turns it upright using the camera's orientation, and re-saves it as a JPEG. */
+private fun shrinkPhoto(context: Context, uri: Uri, name: String): Upload {
+    val cr = context.contentResolver
+    val unreadable = ApiException("That image could not be read. Choose a JPG, PNG or PDF.")
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    // Measuring only: decodeStream returns no bitmap in this mode, so success is judged by the size it fills in.
+    (cr.openInputStream(uri) ?: throw ApiException("Could not read that file.")).use { BitmapFactory.decodeStream(it, null, bounds) }
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw unreadable
+    // Power-of-two downsampling keeps memory small even for a 50-megapixel photo; the exact size is set below.
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_PHOTO_EDGE) sample *= 2
+    var bitmap = cr.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) } ?: throw unreadable
+    val orientation = runCatching {
+        cr.openInputStream(uri)?.use { ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL) }
+    }.getOrNull() ?: ExifInterface.ORIENTATION_NORMAL
+    val matrix = Matrix().apply {
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> postRotate(270f)
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> postScale(-1f, 1f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> postScale(1f, -1f)
+            ExifInterface.ORIENTATION_TRANSPOSE -> { postRotate(90f); postScale(-1f, 1f) }
+            ExifInterface.ORIENTATION_TRANSVERSE -> { postRotate(270f); postScale(-1f, 1f) }
+        }
+        val longest = maxOf(bitmap.width, bitmap.height)
+        if (longest > MAX_PHOTO_EDGE) { val f = MAX_PHOTO_EDGE.toFloat() / longest; postScale(f, f) }
+    }
+    bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    // JPEG has no transparency: put a PNG with a transparent background on white rather than black.
+    if (bitmap.hasAlpha()) {
+        val flat = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        Canvas(flat).apply { drawColor(Color.WHITE); drawBitmap(bitmap, 0f, 0f, null) }
+        bitmap = flat
+    }
+    val out = ByteArrayOutputStream()
+    bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+    bitmap.recycle()
+    return Upload(name.substringBeforeLast('.', name) + ".jpg", "image/jpeg", out.toByteArray())
 }
 
 @Composable
@@ -175,7 +229,8 @@ private fun KycPanel(c: Profile, onSubmitted: () -> Unit) {
     val pickAddr = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { addrUri = it?.toString() }
     val panName = remember(panUri) { panUri?.let { displayName(context, Uri.parse(it)) ?: "document chosen" } }
     val addrName = remember(addrUri) { addrUri?.let { displayName(context, Uri.parse(it)) ?: "document chosen" } }
-    val types = arrayOf("image/jpeg", "image/png", "image/webp", "application/pdf")
+    // Any photo (JPG, PNG, WebP, and phone formats such as HEIC) or a PDF; photos are converted to JPEG before upload.
+    val types = arrayOf("image/*", "application/pdf")
 
     Panel {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -199,7 +254,7 @@ private fun KycPanel(c: Profile, onSubmitted: () -> Unit) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { ADDRESS_PROOFS.drop(2).forEach { t -> FilterChip(addrType == t, { addrType = t }, label = { Text(t) }) } }
                 OutlinedTextField(last4, { last4 = it.filter(Char::isDigit).take(4) }, label = { Text("Last 4 digits of $addrType") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
-                GhostButton(panName?.let { "PAN: $it" } ?: "Choose PAN card (JPG, PNG or PDF)", onClick = { pickPan.launch(types) }, modifier = Modifier.fillMaxWidth())
+                GhostButton(panName?.let { "PAN: $it" } ?: "Choose PAN card (photo or PDF)", onClick = { pickPan.launch(types) }, modifier = Modifier.fillMaxWidth())
                 GhostButton(addrName?.let { "$addrType: $it" } ?: "Choose $addrType document", onClick = { pickAddr.launch(types) }, modifier = Modifier.fillMaxWidth())
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(consent, { consent = it })

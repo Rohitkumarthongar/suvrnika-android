@@ -51,6 +51,9 @@ class Repository(private val context: Context, val tokens: TokenStore) {
                 else -> "Something went wrong. Please try again."
             }
             throw ApiException(message, detail?.code.orEmpty(), e.code())
+        } catch (e: java.net.SocketTimeoutException) {
+            // Connected, but too slow: say so, instead of "offline" (a big upload on a weak signal looks like this).
+            throw ApiException("That took too long. Check your signal and try again.", "timeout")
         } catch (e: IOException) {
             throw ApiException("You appear to be offline. Check your connection and try again.", "offline")
         }

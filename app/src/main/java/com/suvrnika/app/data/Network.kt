@@ -73,7 +73,9 @@ private class TokenRefresher(private val store: TokenStore, private val baseUrl:
 fun createApi(store: TokenStore, baseUrl: String = BuildConfig.API_BASE_URL): Pair<SuvrnikaApi, OkHttpClient> {
     val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        // OkHttp's default is 10 s per write, which a slow mobile uplink can exceed while sending a photo.
+        .writeTimeout(90, TimeUnit.SECONDS)
         .addInterceptor(AuthHeaders(store))
         .authenticator(TokenRefresher(store, baseUrl))
         .build()
