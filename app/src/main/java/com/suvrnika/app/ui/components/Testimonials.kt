@@ -88,8 +88,6 @@ private fun TestimonialCard(t: Testimonial, modifier: Modifier = Modifier) {
  */
 @Composable
 fun TestimonialsSection(data: TestimonialsResponse, onChanged: () -> Unit, signIn: () -> Unit, openProfile: () -> Unit) {
-    // Nothing to show and nothing the visitor can do about it: leave the section out rather than show an empty box.
-    if (data.count == 0 && !data.canWrite) return
     val repo = LocalRepo.current
     val runner = rememberRunner()
     var editing by rememberSaveable { mutableStateOf(false) }
@@ -104,6 +102,7 @@ fun TestimonialsSection(data: TestimonialsResponse, onChanged: () -> Unit, signI
                 Muted("%.1f from %d verified customer%s".format(data.average, data.count, if (data.count == 1) "" else "s"))
             }
         }
+        if (data.count == 0) Muted("No testimonials yet. Be the first to share your experience with Suvrnika.", Modifier.fillMaxWidth())
         if (data.items.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 16.dp)) {
             items(data.items, key = { it.id }) { t -> TestimonialCard(t, Modifier.width(280.dp)) }
         }
