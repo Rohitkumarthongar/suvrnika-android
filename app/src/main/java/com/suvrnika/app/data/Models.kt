@@ -156,7 +156,10 @@ import kotlinx.serialization.Serializable
     val id: String, val name: String, val mobile: String? = null, val email: String? = null, val emailVerified: Boolean = false,
     val dob: String? = null, val nominee: String? = null, val address: String? = null, val homeBranch: Branch? = null,
     val memberSince: String? = null, val kyc: Kyc = Kyc(), val message: String? = null,
+    /** Profile photo (server-relative /media/… or a full URL); null when none. */
+    val photoUrl: String? = null,
 )
+@Serializable data class PhotoResult(val photoUrl: String? = null, val message: String? = null)
 @Serializable data class ProfileUpdate(val name: String, val dob: String, val nominee: String, val address: String)
 @Serializable data class EmailRequest(val email: String)
 @Serializable data class EmailVerifyRequest(val email: String, val code: String)

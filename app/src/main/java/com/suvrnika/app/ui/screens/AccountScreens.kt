@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.suvrnika.app.data.ApiException
 import com.suvrnika.app.data.LedgerEntry
+import com.suvrnika.app.ui.components.Avatar
 import com.suvrnika.app.ui.components.Chip
 import com.suvrnika.app.ui.components.Divider
 import com.suvrnika.app.ui.components.Eyebrow
@@ -137,10 +138,14 @@ fun AccountScreen() {
     val me = rememberLoad(signedIn) { call { me() } }
     LoadList(me) { c ->
         item {
-            Column {
-                Eyebrow("My account")
-                Text("Hello, ${c.name.substringBefore(' ')}", style = MaterialTheme.typography.displaySmall)
-                Muted("${c.mobile?.let(::mobile) ?: c.email ?: ""} · Member since ${c.memberSince?.take(4) ?: ""}")
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                // Tapping the photo opens Profile & KYC, where it can be added or changed.
+                Box(Modifier.clickable { nav.navigate("profile") }) { Avatar(c.name, c.photoUrl, 64.dp) }
+                Column(Modifier.weight(1f)) {
+                    Eyebrow("My account")
+                    Text("Hello, ${c.name.substringBefore(' ')}", style = MaterialTheme.typography.displaySmall)
+                    Muted("${c.mobile?.let(::mobile) ?: c.email ?: ""} · Member since ${c.memberSince?.take(4) ?: ""}")
+                }
             }
         }
         item { LinkList(links) { nav.navigate(it) } }

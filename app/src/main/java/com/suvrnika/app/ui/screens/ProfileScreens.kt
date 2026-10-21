@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +38,7 @@ import com.suvrnika.app.data.ApiException
 import com.suvrnika.app.data.Profile
 import com.suvrnika.app.data.ProfileUpdate
 import com.suvrnika.app.data.Upload
+import com.suvrnika.app.ui.components.Avatar
 import com.suvrnika.app.ui.components.Chip
 import com.suvrnika.app.ui.components.Divider
 import com.suvrnika.app.ui.components.GhostButton
@@ -68,9 +70,36 @@ fun ProfileScreen() {
     if (!signedIn) return SignInPrompt("Sign in to manage your profile.")
     val state = rememberLoad { call { me() } }
     LoadList(state) { c ->
+        item { ProfilePhoto(c, onChanged = state::refresh) }
         item { PersonalDetails(c, onSaved = state::refresh) }
         item { LoginSecurity(c, onChanged = state::refresh) }
         item { KycPanel(c, onSubmitted = state::refresh) }
+    }
+}
+
+/** Profile photo: pick from the gallery and it uploads at once (kept where the store chose in Integrations). */
+@Composable
+private fun ProfilePhoto(c: Profile, onChanged: () -> Unit) {
+    val repo = LocalRepo.current
+    val runner = rememberRunner()
+    val context = LocalContext.current
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) runner.run(onDone = onChanged) { repo.uploadPhoto(readUpload(context, uri)).message }
+    }
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Avatar(c.name, c.photoUrl, 72.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Profile photo", fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GhostButton(if (runner.busy) "Saving…" else if (c.photoUrl != null) "Change" else "Add photo", enabled = !runner.busy, onClick = {
+                        pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    })
+                    if (c.photoUrl != null) TextButton(enabled = !runner.busy, onClick = { runner.run(onDone = onChanged) { repo.call { removePhoto() }.message } }) { Text("Remove", color = Brand.Bad) }
+                }
+                Muted("JPG, PNG or WebP")
+            }
+        }
     }
 }
 

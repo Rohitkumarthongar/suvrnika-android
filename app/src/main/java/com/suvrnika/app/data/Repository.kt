@@ -86,6 +86,10 @@ class Repository(private val context: Context, val tokens: TokenStore) {
         }
     }
 
+    // ---- Profile photo
+    suspend fun uploadPhoto(photo: Upload): PhotoResult =
+        call { uploadPhoto(MultipartBody.Part.createFormData("photo", photo.name, photo.bytes.toRequestBody(photo.mimeType.toMediaType()))) }
+
     /** Downloads an invoice PDF into the app cache (shared with a viewer through FileProvider). */
     suspend fun downloadInvoice(orderId: String, invoiceNumber: String): File {
         val body = call { invoicePdf(orderId) }

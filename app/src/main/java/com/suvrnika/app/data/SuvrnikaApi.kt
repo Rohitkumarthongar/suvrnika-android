@@ -63,6 +63,9 @@ interface SuvrnikaApi {
     // ---- account
     @GET("api/v1/me") suspend fun me(): Profile
     @PATCH("api/v1/me") suspend fun updateMe(@Body body: ProfileUpdate): Profile
+    /** Profile photo: multipart with one file field `photo` (JPG, PNG or WebP). */
+    @Multipart @POST("api/v1/me/photo") suspend fun uploadPhoto(@Part photo: MultipartBody.Part): PhotoResult
+    @DELETE("api/v1/me/photo") suspend fun removePhoto(): PhotoResult
     @POST("api/v1/me/email/send-code") suspend fun sendEmailCode(@Body body: EmailRequest): DevHint
     @POST("api/v1/me/email/verify") suspend fun verifyEmail(@Body body: EmailVerifyRequest): ActionResult
     @Multipart @POST("api/v1/me/kyc") suspend fun submitKyc(

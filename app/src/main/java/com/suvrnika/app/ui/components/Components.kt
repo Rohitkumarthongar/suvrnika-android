@@ -302,6 +302,16 @@ fun RemoteImage(url: String, modifier: Modifier = Modifier, contentScale: Conten
     }
 }
 
+/** A round profile photo, or the first letter of the name on the store's ivory when there is none. */
+@Composable
+fun Avatar(name: String, photoUrl: String?, size: androidx.compose.ui.unit.Dp = 56.dp) {
+    val url = LocalRepo.current.imageUrl(photoUrl?.ifBlank { null })
+    Box(Modifier.size(size).clip(CircleShape).background(Brand.Ivory).border(1.dp, Brand.Line, CircleShape), Alignment.Center) {
+        if (url != null) RemoteImage(url, Modifier.fillMaxSize())
+        else Text((name.trim().firstOrNull() ?: '?').uppercase(), color = Brand.Gold, style = MaterialTheme.typography.headlineSmall)
+    }
+}
+
 @Composable
 private fun Shimmer(modifier: Modifier) {
     val x by rememberInfiniteTransition(label = "shimmer").animateFloat(-1f, 2f, infiniteRepeatable(tween(1300), RepeatMode.Restart), label = "x")
