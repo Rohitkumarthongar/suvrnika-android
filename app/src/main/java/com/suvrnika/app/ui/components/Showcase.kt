@@ -66,7 +66,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavHostController
-import coil.compose.AsyncImage
 import com.suvrnika.app.BuildConfig
 import com.suvrnika.app.data.Item
 import com.suvrnika.app.data.Offer
@@ -188,7 +187,7 @@ fun HeroCarousel(slides: List<Slide>, modifier: Modifier = Modifier) {
             val repo = LocalRepo.current
             Box(Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)).background(bg).clickable(onClick = s.onClick)) {
                 repo.imageUrl(s.imageUrl)?.let { url ->
-                    AsyncImage(url, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    RemoteImage(url, Modifier.fillMaxSize())
                     Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(alpha = 0.65f), Color.Transparent))))
                 }
                 // decorative rings, echoing the logo
@@ -361,7 +360,7 @@ fun OfferPopupHost(currentRoute: String, blocked: Boolean) {
             Modifier.padding(24.dp).widthIn(max = 420.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Brand.Ivory),
         ) {
             Box(Modifier.fillMaxWidth().height(170.dp).background(Brush.linearGradient(listOf(Brand.EmeraldHi, Brand.Emerald, Brand.EmeraldLo)))) {
-                repo.imageUrl(popup.imageUrl.ifBlank { null })?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                repo.imageUrl(popup.imageUrl.ifBlank { null })?.let { RemoteImage(it, Modifier.fillMaxSize()) }
                 Box(Modifier.align(Alignment.Center).size(120.dp).border(1.dp, Brand.GoldLight.copy(alpha = 0.4f), CircleShape))
                 Box(Modifier.align(Alignment.Center).size(84.dp).border(1.dp, Brand.GoldLight.copy(alpha = 0.6f), CircleShape), Alignment.Center) {
                     Text(if (o != null) "%" else "12", color = Brand.GoldLight, style = MaterialTheme.typography.displaySmall)

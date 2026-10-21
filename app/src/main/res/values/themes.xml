@@ -3,4 +3,12 @@
         <item name="android:statusBarColor">#FF17302A</item>
         <item name="android:windowBackground">#FFFAF7F2</item>
     </style>
+
+    <!-- Opening screen: the app icon centred on the store's ivory background, shown while MainActivity keeps it
+         (StartupLoader: store settings + first-screen photos, at most 4 s), then the normal theme. -->
+    <style name="Theme.Suvrnika.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#FFFAF7F2</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.Suvrnika</item>
+    </style>
 </resources>

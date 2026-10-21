@@ -61,7 +61,15 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavHostController
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.Brush
+import coil.compose.AsyncImagePainter
 import com.suvrnika.app.data.ApiException
 import com.suvrnika.app.data.AppConfig
 import com.suvrnika.app.data.Item
@@ -279,12 +287,39 @@ fun Divider() = HorizontalDivider(color = Brand.Line)
 private fun metalBg(metal: String) = when (metal) { "SILVER" -> Color(0xFFE3E8EE); "DIAMOND" -> Brand.Sand; else -> Brand.GoldPale }
 
 /** Product photo, or the storefront's metal-tinted placeholder when there is none. */
+/**
+ * A photo from the store: a soft shimmer while it downloads, then the photo fades in — never a broken or stand-in
+ * picture. If it can't be loaded the shimmer stops and the background behind it stays.
+ */
+@Composable
+fun RemoteImage(url: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Crop) {
+    SubcomposeAsyncImage(model = url, contentDescription = null, contentScale = contentScale, modifier = modifier) {
+        when (painter.state) {
+            is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
+            is AsyncImagePainter.State.Error -> Box(Modifier.fillMaxSize())
+            else -> Shimmer(Modifier.fillMaxSize())
+        }
+    }
+}
+
+@Composable
+private fun Shimmer(modifier: Modifier) {
+    val x by rememberInfiniteTransition(label = "shimmer").animateFloat(-1f, 2f, infiniteRepeatable(tween(1300), RepeatMode.Restart), label = "x")
+    BoxWithConstraints(modifier) {
+        val w = constraints.maxWidth.toFloat().coerceAtLeast(1f)
+        Box(Modifier.fillMaxSize().background(Brush.linearGradient(
+            listOf(Color.White.copy(alpha = 0f), Color.White.copy(alpha = 0.45f), Color.White.copy(alpha = 0f)),
+            start = androidx.compose.ui.geometry.Offset(w * x - w / 2, 0f), end = androidx.compose.ui.geometry.Offset(w * x + w / 2, 0f),
+        )))
+    }
+}
+
 @Composable
 fun ItemImage(imageUrl: String?, metal: String, modifier: Modifier = Modifier) {
     val repo = LocalRepo.current
     Box(modifier.background(metalBg(metal)), Alignment.Center) {
         val url = repo.imageUrl(imageUrl)
-        if (url != null) AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        if (url != null) RemoteImage(url, Modifier.fillMaxSize())
         else Icon(Icons.Outlined.Diamond, contentDescription = null, tint = Brand.Gold.copy(alpha = 0.55f), modifier = Modifier.size(48.dp))
     }
 }

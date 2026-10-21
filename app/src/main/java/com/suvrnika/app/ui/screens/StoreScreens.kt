@@ -79,7 +79,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.suvrnika.app.data.ApiException
 import com.suvrnika.app.data.CatalogueResponse
 import com.suvrnika.app.data.Item
@@ -94,6 +93,7 @@ import com.suvrnika.app.ui.components.HeroCarousel
 import com.suvrnika.app.ui.components.ItemImage
 import com.suvrnika.app.ui.components.ItemRail
 import com.suvrnika.app.ui.components.ProductGridSection
+import com.suvrnika.app.ui.components.RemoteImage
 import com.suvrnika.app.ui.components.JournalCard
 import com.suvrnika.app.ui.components.KeyValue
 import com.suvrnika.app.ui.components.LoadGrid
@@ -270,7 +270,7 @@ fun HomeScreen() {
                         Column(Modifier.width(78.dp).clickable { nav.navigate("shop?cat=${c.id}") }, horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(Modifier.size(68.dp).clip(CircleShape).background(Brand.GoldPale).border(1.dp, Brand.GoldSoft, CircleShape), Alignment.Center) {
                                 val url = repo.imageUrl(c.imageUrl)
-                                if (url != null) AsyncImage(url, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                if (url != null) RemoteImage(url, Modifier.fillMaxSize())
                                 else Text(c.name.take(1), style = MaterialTheme.typography.headlineMedium, color = Brand.Gold)
                             }
                             Spacer(Modifier.height(6.dp))

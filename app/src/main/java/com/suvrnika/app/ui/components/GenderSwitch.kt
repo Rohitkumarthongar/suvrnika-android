@@ -38,7 +38,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.suvrnika.app.ui.theme.Brand
 import com.suvrnika.app.ui.theme.StoreView
 
@@ -121,7 +120,7 @@ private fun GenderCard(
             .clickable { StoreView.set(gender); onPicked() },
     ) {
         val url = repo.imageUrl(image)
-        if (url != null) AsyncImage(url, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        if (url != null) RemoteImage(url, Modifier.fillMaxSize())
         else Icon(Icons.Outlined.Diamond, null, tint = Color(0xFF8C5E14).copy(alpha = 0.35f), modifier = Modifier.align(Alignment.Center).padding(bottom = 50.dp).size(72.dp))
         Column(
             Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xBD100C06))))

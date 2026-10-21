@@ -136,7 +136,7 @@ private val FAB_ROUTES = setOf("home", "shop", "wishlist")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme {
+fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator, initialConfig: com.suvrnika.app.data.AppConfig? = null) = SuvrnikaTheme {
     val nav = rememberNavController()
     val snack = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -148,7 +148,7 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator) = SuvrnikaTheme
     // Company setup (logo, name, metals, popup, rules…) is fetched again every time the app comes back to
     // the foreground, so changes made in Admin show up without reinstalling. A failed refresh keeps the last value.
     val configTick = remember { mutableIntStateOf(0) }
-    val config by androidx.compose.runtime.produceState<com.suvrnika.app.data.AppConfig?>(null, signedIn, configTick.intValue) {
+    val config by androidx.compose.runtime.produceState(initialConfig, signedIn, configTick.intValue) {
         runCatching { repo.call { config() } }.getOrNull()?.let { value = it }
     }
     val bagCount by androidx.compose.runtime.produceState(0, signedIn, bagTick.intValue) {

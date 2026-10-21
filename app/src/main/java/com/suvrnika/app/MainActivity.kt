@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.razorpay.PaymentData
 import com.razorpay.PaymentResultWithDataListener
 import com.suvrnika.app.payment.PaymentCoordinator
@@ -13,10 +14,12 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     private val app get() = application as SuvrnikaApp
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Opening screen: the app icon on the store background until the first screen's data and photos are ready.
+        installSplashScreen().setKeepOnScreenCondition { !app.startup.ready.value }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         app.payments.activity = this
-        setContent { SuvrnikaRoot(app.repo, app.payments) }
+        setContent { SuvrnikaRoot(app.repo, app.payments, app.startup.firstConfig) }
     }
 
     override fun onDestroy() {
