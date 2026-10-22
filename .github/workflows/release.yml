@@ -10,7 +10,7 @@
 # One-time setup (repository Settings → Secrets and variables → Actions):
 #   Secrets   SUVRNIKA_KEYSTORE_BASE64   base64 of the release keystore (keep the .jks safe: every update must use it)
 #             SUVRNIKA_KEYSTORE_PASSWORD, SUVRNIKA_KEY_ALIAS, SUVRNIKA_KEY_PASSWORD
-#   Variables SUVRNIKA_API_URL (default https://suvrnika.kodaic.cloud/), SUVRNIKA_ICON_BACKGROUND (default #FFFFFF)
+#   Variables SUVRNIKA_API_URL (default https://shreejeweller.cloud/), SUVRNIKA_ICON_BACKGROUND (default #FFFFFF)
 name: Release Android app
 
 on:
@@ -34,7 +34,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  API_URL: ${{ vars.SUVRNIKA_API_URL || 'https://suvrnika.kodaic.cloud/' }}
+  API_URL: ${{ vars.SUVRNIKA_API_URL || 'https://shreejeweller.cloud/' }}
   ICON_BACKGROUND: ${{ vars.SUVRNIKA_ICON_BACKGROUND || '#FFFFFF' }}
 
 jobs:
@@ -105,10 +105,10 @@ jobs:
           NAME: ${{ steps.v.outputs.name }}
           NOTES: ${{ github.event.inputs.notes || github.event.client_payload.notes || github.event.head_commit.message }}
         run: |
-          apk="suvrnika-$NAME.apk"
+          apk="shreejewellers-$NAME.apk"
           cp app/build/outputs/apk/release/app-release.apk "$apk"
           sha=$(sha256sum "$apk" | cut -d' ' -f1)
           summary=$(printf '%s' "$NOTES" | head -n 1)
           # The app reads the hidden line to compare versions and verify the download.
           printf '%s\n\n<!-- suvrnika:versionCode=%s sha256=%s -->\n' "${summary:-Improvements and fixes.}" "$CODE" "$sha" > notes.md
-          gh release create "v$NAME" "$apk" --title "Suvrnika $NAME" --notes-file notes.md --latest
+          gh release create "v$NAME" "$apk" --title "Shree Jewellers $NAME" --notes-file notes.md --latest

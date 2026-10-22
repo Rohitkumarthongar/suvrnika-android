@@ -1,4 +1,4 @@
-# Suvrnika Android app
+# Shree Jewellers Android app
 
 Native Android app (Kotlin, Jetpack Compose) for **customers**. It has every feature of the
 website's customer portal and uses the same account, so a customer sees the same wallet,
@@ -48,7 +48,7 @@ From the command line:
 ```bash
 cd android
 ./gradlew assembleDebug                                                  # app/build/outputs/apk/debug/
-./gradlew assembleRelease -PsuvrnikaApiUrl=https://shop.example.com/     # production server (https only)
+./gradlew assembleRelease -PsuvrnikaApiUrl=https://shreejeweller.cloud/     # production server (https only)
 ```
 
 Release builds allow HTTPS only. Cleartext HTTP is allowed only in debug builds, and only to

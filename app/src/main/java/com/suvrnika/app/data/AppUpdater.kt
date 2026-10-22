@@ -70,7 +70,7 @@ class AppUpdater(private val context: Context) {
     /** Downloads the APK (reporting 0..1 progress) and checks its SHA-256. Re-uses an earlier complete download. */
     suspend fun download(update: AppUpdate, onProgress: (Float) -> Unit): File = withContext(Dispatchers.IO) {
         dir.mkdirs()
-        val target = File(dir, "suvrnika-${update.versionCode}.apk")
+        val target = File(dir, "shreejewellers-${update.versionCode}.apk")
         if (target.exists() && update.sha256 != null && sha256(target) == update.sha256) return@withContext target
         dir.listFiles()?.forEach { it.delete() } // older downloads
         val part = File(dir, target.name + ".part")

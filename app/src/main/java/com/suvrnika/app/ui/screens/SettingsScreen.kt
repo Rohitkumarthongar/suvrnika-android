@@ -63,6 +63,6 @@ fun SettingsScreen() {
                 }
             }
         }
-        Text("Suvrnika ${updates.versionName}", style = MaterialTheme.typography.labelSmall, color = Brand.Muted, modifier = Modifier.align(Alignment.CenterHorizontally))
+        Text("Shree Jewellers ${updates.versionName}", style = MaterialTheme.typography.labelSmall, color = Brand.Muted, modifier = Modifier.align(Alignment.CenterHorizontally))
     }
 }

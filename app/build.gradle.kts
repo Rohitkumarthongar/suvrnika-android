@@ -20,7 +20,8 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.suvrnika.app"
+        // Shree Jewellers app identity (Play Store). Kotlin packages stay com.suvrnika.app internally (namespace).
+        applicationId = "com.shreejewellers.app"
         minSdk = 26
         targetSdk = 35
         versionCode = appVersionCode

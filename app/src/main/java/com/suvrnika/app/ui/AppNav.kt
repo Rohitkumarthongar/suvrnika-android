@@ -208,7 +208,7 @@ fun SuvrnikaRoot(repo: Repository, payments: PaymentCoordinator, initialConfig: 
                                 modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)),
                             )
                             Column {
-                                Text(config?.company?.name ?: "SUVRNIKA", fontFamily = Display, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, letterSpacing = 3.sp)
+                                Text(config?.company?.name ?: "SHREE JEWELLERS", fontFamily = Display, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, letterSpacing = 3.sp)
                                 Text((config?.company?.tag?.ifBlank { null } ?: "Fine jewellery").uppercase(), fontSize = 9.sp, letterSpacing = 2.sp, color = Brand.Gold, fontWeight = FontWeight.Bold)
                             }
                         }

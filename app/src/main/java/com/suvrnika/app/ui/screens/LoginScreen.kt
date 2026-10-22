@@ -57,7 +57,7 @@ fun LoginScreen() {
     val cleanValue = if (channel == "mobile") value.filter(Char::isDigit) else value.trim().lowercase()
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Eyebrow(cfg?.company?.name ?: "Suvrnika")
+        Eyebrow(cfg?.company?.name ?: "Shree Jewellers")
         Text(if (step == "signup") "Welcome! Tell us your name" else "Sign in or create an account", style = MaterialTheme.typography.headlineMedium)
         when (step) {
             "contact" -> {
@@ -107,7 +107,7 @@ fun LoginScreen() {
                 )
                 PrimaryButton("Create account", busy = runner.busy, enabled = name.trim().length >= 2, modifier = Modifier.fillMaxWidth(), onClick = {
                     val cleanExtra = if (channel == "email") extra.filter(Char::isDigit) else extra.trim().lowercase()
-                    runner.run { repo.signup(signupToken, name, cleanExtra); done(); "Welcome to ${cfg?.company?.name ?: "Suvrnika"}!" }
+                    runner.run { repo.signup(signupToken, name, cleanExtra); done(); "Welcome to ${cfg?.company?.name ?: "Shree Jewellers"}!" }
                 })
             }
         }
