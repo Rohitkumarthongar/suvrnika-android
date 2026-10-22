@@ -15,6 +15,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,6 +48,9 @@ fun LoginScreen() {
     var signupToken by rememberSaveable { mutableStateOf("") }
     var name by rememberSaveable { mutableStateOf("") }
     var extra by rememberSaveable { mutableStateOf("") }
+    // The store can switch SMS sign-in codes off (Admin → Company setup); then only email is offered.
+    val phoneOtp = cfg?.rules?.phoneOtp ?: true
+    LaunchedEffect(phoneOtp) { if (!phoneOtp && channel == "mobile") { channel = "email"; value = "" } }
     var hint by rememberSaveable { mutableStateOf<String?>(null) }
     val done = { bagChanged(); nav.popBackStack() }
 
@@ -57,7 +61,7 @@ fun LoginScreen() {
         Text(if (step == "signup") "Welcome! Tell us your name" else "Sign in or create an account", style = MaterialTheme.typography.headlineMedium)
         when (step) {
             "contact" -> {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (phoneOtp) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = channel == "mobile", onClick = { channel = "mobile"; value = "" }, label = { Text("Mobile") })
                     FilterChip(selected = channel == "email", onClick = { channel = "email"; value = "" }, label = { Text("Email") })
                 }

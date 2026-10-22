@@ -45,7 +45,11 @@ import kotlinx.serialization.Serializable
     val earnPer100: Double = 1.0, val earnBase: String = "PAYABLE", val pointValuePaise: Long = 100, val maxRedeemPct: Int = 10, val minRedeem: Long = 100,
     val convertToGold: Boolean = true, val planEarnPer100: Double = 0.0, val signupBonus: Long = 0, val expiryMonths: Int = 12,
 )
-@Serializable data class Rules(val metalNeedsKyc: Boolean = true, val panAbovePaise: Long = 0)
+@Serializable data class Rules(
+    val metalNeedsKyc: Boolean = true, val panAbovePaise: Long = 0,
+    /** Admin setting "Sign-in codes by SMS": false = sign in with email only. */
+    val phoneOtp: Boolean = true,
+)
 @Serializable data class Popup(val enabled: Boolean = false, val delaySeconds: Int = 10, val headline: String = "", val sub: String = "", val schemeId: String? = null, val imageUrl: String = "")
 @Serializable data class PayMethods(val upi: Boolean = true, val card: Boolean = true, val netbanking: Boolean = true, val emi: Boolean = true, val autopay: Boolean = true)
 @Serializable data class PaymentsConfig(val provider: String = "none", val methods: PayMethods = PayMethods())
