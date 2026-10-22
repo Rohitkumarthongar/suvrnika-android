@@ -22,6 +22,17 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         setContent { SuvrnikaRoot(app.repo, app.payments, app.startup.firstConfig) }
     }
 
+    // Cashfree payments open in the browser; coming back tells the coordinator to confirm the payment.
+    override fun onPause() {
+        app.payments.onAppPaused()
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        app.payments.onAppResumed()
+    }
+
     override fun onDestroy() {
         if (app.payments.activity === this) app.payments.activity = null
         super.onDestroy()

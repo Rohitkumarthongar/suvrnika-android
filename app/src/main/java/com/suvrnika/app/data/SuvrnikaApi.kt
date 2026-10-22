@@ -58,6 +58,8 @@ interface SuvrnikaApi {
     @GET("api/v1/payments/{id}") suspend fun payment(@Path("id") id: String): PaymentStatusResponse
     @POST("api/v1/payments/{id}/verify") suspend fun verifyPayment(@Path("id") id: String, @Body body: VerifyPaymentRequest): PaymentStatusResponse
     @POST("api/v1/payments/{id}/cancel") suspend fun cancelPayment(@Path("id") id: String): PaymentStatusResponse
+    /** Cashfree payments: the server asks Cashfree how the payment ended and completes it if paid. */
+    @POST("api/v1/payments/{id}/confirm") suspend fun confirmPayment(@Path("id") id: String): PaymentConfirmResponse
     @POST("api/v1/payments/{id}/mock") suspend fun mockPay(@Path("id") id: String): PaymentStatusResponse
 
     // ---- account

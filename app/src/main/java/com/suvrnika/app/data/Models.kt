@@ -136,6 +136,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class PaymentStart(
     val mode: String, val paymentId: String, val razorpayOrderId: String? = null, val keyId: String? = null, val amountPaise: Long = 0,
     val name: String = "", val description: String = "", val prefill: Prefill? = null,
+    /** mode "cashfree": the store's secure payment page, opened in the browser. */
+    val checkoutUrl: String? = null,
 )
 @Serializable data class CheckoutResponse(val orderId: String, val orderNumber: String, val payablePaise: Long = 0, val offerDiscountPaise: Long = 0, val payment: PaymentStart)
 @Serializable data class PaymentStartResponse(val payment: PaymentStart)
@@ -145,6 +147,8 @@ import kotlinx.serialization.Serializable
     val createdAt: String? = null, val paidAt: String? = null, val order: OrderRef? = null,
 )
 @Serializable data class PaymentStatusResponse(val payment: PaymentStatus)
+/** status: PAID | PENDING (UPI still confirming) | FAILED — checked by the server with Cashfree. */
+@Serializable data class PaymentConfirmResponse(val status: String, val payment: PaymentStatus)
 @Serializable data class VerifyPaymentRequest(val razorpayOrderId: String, val razorpayPaymentId: String, val razorpaySignature: String)
 
 // ---------------------------------------------------------------- account
